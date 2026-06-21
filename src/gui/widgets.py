@@ -515,3 +515,113 @@ class HistoryRow(QWidget):
         self.setStyleSheet(
             f"background: transparent; border-bottom: 1px solid {BORDER_MID};"
         )
+
+
+# ── Temporal Timeline Graph ────────────────────────────────────────────────────
+
+class TimelineGraph(QWidget):
+    """Static painted timeline of (timestamp, score) points for video analysis.
+
+    Unlike HistoryGraph (which scrolls live), this renders a full series at once
+    with a time axis, threshold bands, and verdict-coloured fill.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._series: list[tuple[float, float]] = []
+        self._duration = 0.0
+        self.setMinimumHeight(150)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+    def set_series(self, series: list[tuple[float, float]], duration: float = 0.0):
+        self._series = series or []
+        self._duration = duration or (series[-1][0] if series else 0.0)
+        self.update()
+
+    def clear(self):
+        self._series = []
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        pl, pr, pt, pb = 36, 12, 14, 22
+        gw = w - pl - pr
+        gh = h - pt - pb
+
+        # Background
+        p.setBrush(QColor("#0a0a15"))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(QRectF(0, 0, w, h), 8, 8)
+
+        # Threshold bands (REAL / SUSPICIOUS / DEEPFAKE)
+        for lo, hi, col in [(0.0, 0.40, QColor(16, 185, 129, 16)),
+                            (0.40, 0.65, QColor(245, 158, 11, 16)),
+                            (0.65, 1.0, QColor(244, 63, 94, 18))]:
+            y_top = pt + (1 - hi) * gh
+            band_h = (hi - lo) * gh
+            p.fillRect(QRectF(pl, y_top, gw, band_h), col)
+
+        # Y grid + labels
+        f_axis = QFont(); f_axis.setFamily("JetBrains Mono, monospace"); f_axis.setPointSize(7)
+        p.setFont(f_axis)
+        for frac in [0.0, 0.40, 0.65, 1.0]:
+            y = pt + (1 - frac) * gh
+            p.setPen(QPen(QColor("#18182c"), 1, Qt.PenStyle.DotLine))
+            p.drawLine(QPointF(pl, y), QPointF(w - pr, y))
+            p.setPen(QColor(TEXT_DIM))
+            p.drawText(QRectF(0, y - 7, pl - 5, 14),
+                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                       f"{int(frac*100)}")
+
+        if len(self._series) < 2:
+            p.setPen(QColor(TEXT_DIM))
+            p.setFont(QFont())
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "Load a video and analyze to see the per-frame timeline")
+            return
+
+        dur = self._duration or self._series[-1][0] or 1.0
+
+        def to_pt(ts: float, score: float) -> QPointF:
+            x = pl + (ts / dur) * gw
+            y = pt + (1.0 - max(0.0, min(1.0, score))) * gh
+            return QPointF(x, y)
+
+        # Area fill
+        path = QPainterPath()
+        path.moveTo(to_pt(self._series[0][0], 0).x(), pt + gh)
+        for ts, sc in self._series:
+            path.lineTo(to_pt(ts, sc))
+        path.lineTo(to_pt(self._series[-1][0], 0).x(), pt + gh)
+        path.closeSubpath()
+        grad = QLinearGradient(0, pt, 0, pt + gh)
+        grad.setColorAt(0, QColor(0, 212, 255, 70))
+        grad.setColorAt(1, QColor(0, 212, 255, 0))
+        p.fillPath(path, QBrush(grad))
+
+        # Line with per-segment colour
+        for i in range(len(self._series) - 1):
+            ts0, sc0 = self._series[i]
+            ts1, sc1 = self._series[i + 1]
+            seg_c = _score_qcolor((sc0 + sc1) / 2)
+            p.setPen(QPen(seg_c, 2, Qt.PenStyle.SolidLine,
+                          Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            p.drawLine(to_pt(ts0, sc0), to_pt(ts1, sc1))
+
+        # Point dots
+        for ts, sc in self._series:
+            p.setBrush(_score_qcolor(sc))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(to_pt(ts, sc), 2.5, 2.5)
+
+        # X axis time labels
+        p.setPen(QColor(TEXT_DIM))
+        p.setFont(f_axis)
+        for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
+            x = pl + frac * gw
+            t = frac * dur
+            p.drawText(QRectF(x - 20, h - pb + 3, 40, 14),
+                       Qt.AlignmentFlag.AlignCenter, f"{t:.1f}s")

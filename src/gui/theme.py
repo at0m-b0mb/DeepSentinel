@@ -58,6 +58,10 @@ QWidget {{
 }}
 
 /* ─── Tab bar ─── */
+QTabWidget {{
+    background: {BG_VOID};
+    border: none;
+}}
 QTabWidget::pane {{
     border: 1px solid {BORDER_MID};
     border-top: none;
@@ -65,7 +69,7 @@ QTabWidget::pane {{
     border-radius: 0 10px 10px 10px;
 }}
 QTabBar {{
-    background: transparent;
+    background: {BG_VOID};
 }}
 QTabBar::tab {{
     background: {BG_CARD};

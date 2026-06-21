@@ -22,6 +22,7 @@ from .widgets import PulsingDot, glow_effect
 from ..detection.detector import DeepfakeDetector
 from .live_tab import LiveTab
 from .analyze_tab import AnalyzeTab
+from .batch_tab import BatchTab
 from .education_tab import EducationTab
 from .settings_tab import SettingsTab
 from .dashboard_tab import DashboardTab
@@ -319,18 +320,23 @@ class MainWindow(QMainWindow):
 
         # Tabs
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)          # removes light frame bleed at tab-bar edge
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setDrawBase(False)
         main_l.addWidget(self.tabs, 1)
 
         # Create tabs
         self.dashboard_tab = DashboardTab()
         self.live_tab      = LiveTab(self.detector)
         self.analyze_tab   = AnalyzeTab(self.detector)
+        self.batch_tab     = BatchTab(self.detector)
         self.edu_tab       = EducationTab()
         self.settings_tab  = SettingsTab(self.detector)
 
         self.tabs.addTab(self.dashboard_tab, "  ◈  Dashboard  ")
         self.tabs.addTab(self.live_tab,      "  🎥  Live Detection  ")
         self.tabs.addTab(self.analyze_tab,   "  🔍  Analyze Media  ")
+        self.tabs.addTab(self.batch_tab,     "  🗂  Batch Scan  ")
         self.tabs.addTab(self.edu_tab,       "  📚  How It Works  ")
         self.tabs.addTab(self.settings_tab,  "  ⚙   Settings  ")
 
@@ -343,6 +349,10 @@ class MainWindow(QMainWindow):
         self.live_tab.snapshot_ready.connect(self._on_snapshot)
         self.analyze_tab.status_msg.connect(self._on_status)
         self.analyze_tab.analysis_done.connect(
+            lambda f, v, s: self.dashboard_tab.record_analysis(f, v, s)
+        )
+        self.batch_tab.status_msg.connect(self._on_status)
+        self.batch_tab.analysis_done.connect(
             lambda f, v, s: self.dashboard_tab.record_analysis(f, v, s)
         )
         self.settings_tab.status_msg.connect(self._on_status)
@@ -377,7 +387,8 @@ class MainWindow(QMainWindow):
         file_m.addAction(quit_a)
 
         view_m = mb.addMenu("View")
-        for i, n in enumerate(["Dashboard", "Live Detection", "Analyze Media", "How It Works", "Settings"]):
+        for i, n in enumerate(["Dashboard", "Live Detection", "Analyze Media",
+                               "Batch Scan", "How It Works", "Settings"]):
             a = QAction(n, self)
             a.triggered.connect(lambda _, idx=i: self.tabs.setCurrentIndex(idx))
             view_m.addAction(a)
@@ -409,8 +420,9 @@ class MainWindow(QMainWindow):
             "FFT Frequency Analysis · Error Level Analysis<br>"
             "Face Geometry (OpenCV Haar) · SRM Noise Analysis<br>"
             "MesoNet Neural Network (optional — PyTorch)</p>"
-            "<p><b>New in v1.0:</b> Dashboard, Snapshot→Analyze, EXIF forensics,<br>"
-            "Arc confidence gauge, real-time history graph, batch reports</p>"
+            "<p><b>Features:</b> Dashboard · Live arc gauge · Snapshot→Analyze<br>"
+            "Explainability heatmap · Video temporal analysis (blink + flicker)<br>"
+            "Batch folder scan + CSV · Rich HTML/PDF reports · EXIF forensics</p>"
             "<p><b style='color:#f59e0b'>⚠ For educational and research use only.</b></p>"
             "<p>github.com/at0m-b0mb/DeepSentinel</p>"
         )
@@ -418,4 +430,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if hasattr(self, 'live_tab') and self.live_tab.worker:
             self.live_tab.worker.stop()
+        if hasattr(self, 'batch_tab') and self.batch_tab.worker:
+            self.batch_tab.worker.stop()
+            self.batch_tab.worker.wait(2000)
         super().closeEvent(event)

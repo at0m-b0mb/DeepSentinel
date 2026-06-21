@@ -50,7 +50,19 @@ and learn exactly how deepfakes work under the hood.
     <td align="center" width="50%">
       <img src="assets/screenshots/analyze_media.png" alt="Analyze Media" width="100%" style="border-radius:8px"/>
       <br/>
-      <sub><b>🔍 Analyze Media</b> — Drag-and-drop forensics with EXIF &amp; visualization strip</sub>
+      <sub><b>🔍 Analyze Media</b> — Forensics with the explainability <b>suspicion heatmap</b></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/temporal_analysis.png" alt="Temporal Analysis" width="100%" style="border-radius:8px"/>
+      <br/>
+      <sub><b>🎞 Video Temporal</b> — Per-frame timeline, blink-rate &amp; flicker scoring</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/batch_scan.png" alt="Batch Scan" width="100%" style="border-radius:8px"/>
+      <br/>
+      <sub><b>🗂 Batch Scan</b> — Analyze whole folders, sortable table, CSV export</sub>
     </td>
     <td align="center" width="50%">
       <img src="assets/screenshots/how_it_works.png" alt="Education" width="100%" style="border-radius:8px"/>
@@ -89,9 +101,53 @@ and learn exactly how deepfakes work under the hood.
         <li>Drag-and-drop or browse <b>images &amp; videos</b></li>
         <li>Full multi-method pipeline with progress tracking</li>
         <li>Forensic <b>visualization strip</b>: FFT spectrum, ELA map, noise heatmap</li>
+        <li><b>Explainability heatmap</b> — see <i>where</i> artifacts concentrate</li>
         <li><b>EXIF metadata panel</b> with AI-software flag detection</li>
-        <li>Video: samples 20 frames, averages + peak-weights scores</li>
-        <li>Exportable <b>text report</b> with all scores &amp; interpretation</li>
+        <li>Export <b>rich PDF / HTML / text</b> forensic reports</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🔥 Explainability Heatmap</h3>
+      <ul>
+        <li>Spatial <b>suspicion overlay</b> — cyan (clean) → red (suspect)</li>
+        <li>Fuses ELA, texture-deficit &amp; noise residuals per tile</li>
+        <li>Auto-marks the single hottest <b>hotspot</b> region</li>
+        <li>Toggle between original and heatmap in one click</li>
+        <li>Reports a <b>concentration score</b> (localized vs diffuse)</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎞 Video Temporal Analysis</h3>
+      <ul>
+        <li><b>Per-frame score timeline</b> with threshold bands</li>
+        <li><b>Blink-rate detection</b> — flags abnormally low rates</li>
+        <li><b>Flicker scoring</b> — frame-to-frame identity shimmer</li>
+        <li>Combines temporal + still-frame verdicts</li>
+        <li>Peak-suspicion frame auto-selected for deep analysis</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🗂 Batch Folder Scan</h3>
+      <ul>
+        <li>Point at a folder — analyze <b>every image &amp; video</b></li>
+        <li>Recursive subfolder traversal (optional)</li>
+        <li><b>Sortable results table</b>: file, type, verdict, score, faces</li>
+        <li>Live summary cards: total / fake / suspicious / real</li>
+        <li><b>CSV export</b> of the full result set</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>📄 Rich Report Export</h3>
+      <ul>
+        <li>Self-contained <b>HTML</b> &amp; <b>PDF</b> reports (no external assets)</li>
+        <li>Embeds verdict, all scores &amp; forensic visualizations</li>
+        <li>Includes heatmap, EXIF data &amp; temporal findings</li>
+        <li>Shareable — opens in any browser / PDF viewer</li>
+        <li>Always carries the educational-use disclaimer</li>
       </ul>
     </td>
   </tr>
@@ -140,7 +196,7 @@ and learn exactly how deepfakes work under the hood.
 ## 🏗 Architecture
 
 ```
-Input (frame / image / video)
+Input (frame / image / video / folder)
          │
          ├──▶  FFT Analysis       ── kurtosis + grid-periodicity score
          ├──▶  ELA Forensics      ── JPEG re-compression mismatch score
@@ -149,11 +205,15 @@ Input (frame / image / video)
          └──▶  MesoNet (opt.)     ── CNN classification probability
                     │
                     ▼
-           Weighted Ensemble
+           Weighted Ensemble ───────────────▶  🔥 Explainability Heatmap
+                    │                            (where artifacts concentrate)
                     │
+                    │   video? ──▶  🎞 Temporal Layer
+                    │               (blink-rate · flicker · per-frame timeline)
+                    ▼
          ┌──────────────────────────────┐
          │  score < 0.40  →  REAL       │
-         │  0.40 – 0.65  →  SUSPICIOUS  │
+         │  0.40 – 0.65  →  SUSPICIOUS  │     ──▶  📄 PDF / HTML / CSV report
          │  score > 0.65  →  DEEPFAKE   │
          └──────────────────────────────┘
 ```
@@ -174,21 +234,28 @@ DeepSentinel/
 │   │   ├── face_analyzer.py       # Haar cascade + geometry + boundary checks
 │   │   ├── noise_analyzer.py      # SRM high-pass noise residual analysis
 │   │   ├── mesonet.py             # MesoNet Meso4 (PyTorch, optional)
-│   │   └── metadata.py            # EXIF extraction + AI-software flag detection
+│   │   ├── metadata.py            # EXIF extraction + AI-software flag detection
+│   │   ├── heatmap.py             # Explainability suspicion heatmap (ELA+texture+noise)
+│   │   ├── temporal.py            # Video temporal forensics — blink + flicker
+│   │   └── report.py             # Rich HTML / PDF report generation
 │   │
 │   ├── education/
 │   │   └── pipeline.py            # HTML content for the How It Works tab
 │   │
 │   └── gui/
 │       ├── theme.py               # Dark cyberpunk QSS stylesheet + palette
-│       ├── widgets.py             # ConfidenceDial · HistoryGraph · GlowScoreBar
-│       │                          #   StatCard · PulsingDot · HistoryRow
+│       ├── widgets.py             # ConfidenceDial · HistoryGraph · TimelineGraph
+│       │                          #   GlowScoreBar · StatCard · PulsingDot
 │       ├── main_window.py         # Animated HexLogo · HeaderWidget · tab host
 │       ├── dashboard_tab.py       # Session stats + history + quick actions
 │       ├── live_tab.py            # Webcam feed + CameraWorker QThread
-│       ├── analyze_tab.py         # Static analysis + EXIF + forensic viz strip
+│       ├── analyze_tab.py         # Static analysis + heatmap + temporal + EXIF
+│       ├── batch_tab.py           # Batch folder scan + results table + CSV
 │       ├── education_tab.py       # Sidebar nav + rich-HTML content + code panel
 │       └── settings_tab.py        # Method toggles · thresholds · MesoNet loader
+│
+├── tools/
+│   └── make_screenshots.py        # Renders GUI tabs to PNG for the README
 │
 └── assets/
     ├── banner.png                 # 1280×640 hero banner

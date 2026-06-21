@@ -140,17 +140,19 @@ class DashboardTab(QWidget):
         div.setFixedHeight(1)
         layout.addWidget(div)
 
+        # (label, absolute tab index in MainWindow) — keep in sync with main_window tab order
         actions = [
-            ("🎥  Start Live Detection",  0, "primaryBtn"),
-            ("🔍  Analyze a File",         1, "ghostBtn"),
-            ("📚  Open How It Works",      2, "ghostBtn"),
-            ("⚙   Open Settings",         3, "ghostBtn"),
+            ("🎥  Start Live Detection",  1, "primaryBtn"),
+            ("🔍  Analyze a File",         2, "ghostBtn"),
+            ("🗂  Batch Folder Scan",      3, "ghostBtn"),
+            ("📚  Open How It Works",      4, "ghostBtn"),
+            ("⚙   Open Settings",          5, "ghostBtn"),
         ]
         for label, tab_idx, style in actions:
             btn = QPushButton(label)
             btn.setObjectName(style)
-            btn.setFixedHeight(38)
-            btn.clicked.connect(lambda _, i=tab_idx: self.navigate.emit(i + 1))  # +1 for dashboard offset
+            btn.setFixedHeight(36)
+            btn.clicked.connect(lambda _, i=tab_idx: self.navigate.emit(i))
             layout.addWidget(btn)
 
         layout.addStretch()
