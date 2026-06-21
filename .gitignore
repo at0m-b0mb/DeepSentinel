@@ -19,6 +19,9 @@ models/
 *.ckpt
 *.safetensors
 
+# External MesoNet reference repo (cloned separately for pretrained weights)
+MesoNet/
+
 # macOS
 .DS_Store
 .AppleDouble

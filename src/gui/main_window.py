@@ -9,14 +9,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF
 from PyQt6.QtGui import (
     QFont, QAction, QPainter, QPen, QColor, QLinearGradient,
-    QBrush, QConicalGradient, QPainterPath, QPolygonF,
+    QBrush, QConicalGradient, QRadialGradient, QPainterPath, QPolygonF,
 )
 
 from .theme import (
     CYAN, CYAN_MID, CYAN_DIM, RED, RED_DIM, GREEN, AMBER, PURPLE,
     TEXT_HI, TEXT_MID, TEXT_LO, TEXT_DIM,
     BG_VOID, BG_DEEP, BG_CARD, BG_CARD2, BORDER_MID, BORDER_HI, BORDER_CYAN,
-    FONT_MONO, FONT_UI,
+    FONT_MONO, FONT_UI, rgba,
 )
 from .widgets import PulsingDot, glow_effect
 from ..detection.detector import DeepfakeDetector
@@ -31,20 +31,20 @@ from .dashboard_tab import DashboardTab
 # ── Hex logo widget ───────────────────────────────────────────────────────────
 
 class HexLogo(QWidget):
-    """Painted hexagonal eye/shield logo for DeepSentinel."""
+    """Painted hexagonal eye logo — brand cyan→indigo gradient with a soft shimmer."""
 
     def __init__(self, size: int = 40, parent=None):
         super().__init__(parent)
         self._size = size
         self.setFixedSize(size, size)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self._hue = 0.0
+        self._angle = 0.0
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
-        self._timer.start(40)
+        self._timer.start(33)
 
     def _tick(self):
-        self._hue = (self._hue + 0.8) % 360
+        self._angle = (self._angle + 1.4) % 360
         self.update()
 
     def paintEvent(self, event):
@@ -55,48 +55,53 @@ class HexLogo(QWidget):
         cx, cy = s / 2, s / 2
         r = s / 2 - 3
 
-        # Hex vertices
-        hex_pts = []
-        for i in range(6):
-            a = math.radians(60 * i - 30)
-            hex_pts.append(QPointF(cx + r * math.cos(a), cy + r * math.sin(a)))
+        hex_pts = [QPointF(cx + r * math.cos(math.radians(60 * i - 30)),
+                           cy + r * math.sin(math.radians(60 * i - 30))) for i in range(6)]
         polygon = QPolygonF(hex_pts)
 
-        # Glow fill
-        glow_color = QColor(CYAN)
-        glow_color.setAlpha(30)
-        p.setBrush(glow_color)
-        p.setPen(Qt.PenStyle.NoPen)
+        # Soft radial glow behind the hex
+        glow = QRadialGradient(cx, cy, r * 1.5)
+        gc = QColor(CYAN); gc.setAlpha(60); glow.setColorAt(0.0, gc)
+        glow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setBrush(QBrush(glow)); p.setPen(Qt.PenStyle.NoPen)
+        p.drawEllipse(QPointF(cx, cy), r * 1.4, r * 1.4)
+
+        # Gentle gradient fill inside the hex
+        fill = QLinearGradient(0, 0, s, s)
+        f0 = QColor(CYAN); f0.setAlpha(28)
+        f1 = QColor(PURPLE); f1.setAlpha(20)
+        fill.setColorAt(0.0, f0); fill.setColorAt(1.0, f1)
+        p.setBrush(QBrush(fill)); p.setPen(Qt.PenStyle.NoPen)
         p.drawPolygon(polygon)
 
-        # Hex outline with gradient
-        h = self._hue
-        c1 = QColor.fromHsvF(h / 360.0, 0.9, 1.0)
-        c2 = QColor.fromHsvF(((h + 120) % 360) / 360.0, 0.9, 1.0)
-        grad = QConicalGradient(cx, cy, 0)
-        grad.setColorAt(0.0, c1)
-        grad.setColorAt(0.5, c2)
-        grad.setColorAt(1.0, c1)
-        p.setPen(QPen(QBrush(grad), 2.0))
+        # Hex outline — rotating cyan→indigo conical shimmer
+        grad = QConicalGradient(cx, cy, self._angle)
+        grad.setColorAt(0.0, QColor(CYAN))
+        grad.setColorAt(0.5, QColor(PURPLE))
+        grad.setColorAt(1.0, QColor(CYAN))
+        p.setPen(QPen(QBrush(grad), 2.2))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPolygon(polygon)
 
-        # Inner eye shape
+        # Eye almond
         ir = r * 0.52
-        eye_w = ir * 1.6
-        eye_h = ir * 0.65
-        p.setPen(QPen(QColor(CYAN), 1.5))
+        eye_w, eye_h = ir * 1.65, ir * 0.66
+        p.setPen(QPen(QColor(CYAN), 1.6))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(QRectF(cx - eye_w / 2, cy - eye_h / 2, eye_w, eye_h))
 
-        # Pupil
-        p.setPen(Qt.PenStyle.NoPen)
+        # Pupil with halo
+        ph = QColor(CYAN); ph.setAlpha(70)
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(ph)
+        p.drawEllipse(QPointF(cx, cy), eye_h * 0.55, eye_h * 0.55)
         p.setBrush(QColor(CYAN))
         p.drawEllipse(QPointF(cx, cy), eye_h * 0.4, eye_h * 0.4)
-
-        # Center dot
         p.setBrush(QColor(BG_VOID))
-        p.drawEllipse(QPointF(cx, cy), eye_h * 0.18, eye_h * 0.18)
+        p.drawEllipse(QPointF(cx, cy), eye_h * 0.17, eye_h * 0.17)
+        # Catchlight
+        hl = QColor("#d8f8ff")
+        p.setBrush(hl)
+        p.drawEllipse(QPointF(cx + eye_h * 0.12, cy - eye_h * 0.12), eye_h * 0.07, eye_h * 0.07)
 
 
 # ── Header widget ─────────────────────────────────────────────────────────────
@@ -104,42 +109,43 @@ class HexLogo(QWidget):
 class HeaderWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(58)
+        self.setFixedHeight(70)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(18, 0, 18, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(22, 0, 22, 0)
+        layout.setSpacing(14)
 
         # Animated hex logo
-        self.logo = HexLogo(38)
+        self.logo = HexLogo(42)
         layout.addWidget(self.logo)
 
         # Brand text block
         brand_block = QWidget()
         bl = QVBoxLayout(brand_block)
         bl.setContentsMargins(0, 0, 0, 0)
-        bl.setSpacing(0)
+        bl.setSpacing(2)
 
-        name_lbl = QLabel("DEEP<span style='color:#e8e8ff; font-weight:400'>SENTINEL</span>")
+        name_lbl = QLabel("DEEP<span style='color:#eef2ff; font-weight:500'>SENTINEL</span>")
         name_lbl.setTextFormat(Qt.TextFormat.RichText)
         name_lbl.setStyleSheet(
-            f"color: {CYAN}; font-size: 18px; font-weight: 900; "
-            f"letter-spacing: 3px; font-family: {FONT_UI};"
+            f"color: {CYAN}; font-size: 20px; font-weight: 900; "
+            f"letter-spacing: 3.5px; font-family: {FONT_UI};"
         )
         bl.addWidget(name_lbl)
 
-        tag_lbl = QLabel("AI-Powered Deepfake Detection  ·  Educational Platform  ·  v1.0")
-        tag_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; letter-spacing: 0.5px;")
+        tag_lbl = QLabel("Deepfake Detection & Education Platform")
+        tag_lbl.setStyleSheet(f"color: {TEXT_LO}; font-size: 11px; letter-spacing: 1.2px;")
         bl.addWidget(tag_lbl)
 
         layout.addWidget(brand_block)
         layout.addStretch()
 
-        # Status area
-        status_block = QWidget()
-        sl = QHBoxLayout(status_block)
-        sl.setContentsMargins(0, 0, 0, 0)
+        # Status pill
+        self._status_pill = QFrame()
+        self._status_pill.setObjectName("card2")
+        sl = QHBoxLayout(self._status_pill)
+        sl.setContentsMargins(12, 6, 14, 6)
         sl.setSpacing(8)
 
         self._status_dot = PulsingDot(CYAN)
@@ -147,26 +153,34 @@ class HeaderWidget(QWidget):
         sl.addWidget(self._status_dot)
 
         self._status_lbl = QLabel("Ready")
-        self._status_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px; font-family: monospace;")
+        self._status_lbl.setStyleSheet(f"color: {TEXT_MID}; font-size: 11px; font-family: {FONT_MONO};")
         sl.addWidget(self._status_lbl)
+        layout.addWidget(self._status_pill)
 
-        layout.addWidget(status_block)
+        # version chip
+        ver = QLabel("v1.0")
+        ver.setStyleSheet(
+            f"color: {CYAN}; background: {rgba(CYAN, 0.08)}; border: 1px solid {rgba(CYAN, 0.30)}; "
+            f"border-radius: 8px; font-size: 10px; font-weight: 800; "
+            f"letter-spacing: 1px; padding: 5px 9px; font-family: {FONT_MONO};"
+        )
+        layout.addWidget(ver)
 
         # Edu badge
         badge = QLabel("⚠  EDUCATIONAL USE ONLY")
         badge.setStyleSheet(
-            f"color: {AMBER}; background: {AMBER}18; border: 1px solid {AMBER}44; "
-            f"border-radius: 5px; font-size: 9px; font-weight: 800; "
-            f"letter-spacing: 1.5px; padding: 3px 8px;"
+            f"color: {AMBER}; background: {rgba(AMBER, 0.10)}; border: 1px solid {rgba(AMBER, 0.27)}; "
+            f"border-radius: 8px; font-size: 9px; font-weight: 800; "
+            f"letter-spacing: 1.5px; padding: 6px 10px;"
         )
         layout.addWidget(badge)
 
     def set_status(self, msg: str, level: str = "info"):
-        colors = {"info": TEXT_DIM, "ok": GREEN, "warn": AMBER, "error": RED}
+        colors = {"info": TEXT_MID, "ok": GREEN, "warn": AMBER, "error": RED}
         dot_colors = {"info": CYAN, "ok": GREEN, "warn": AMBER, "error": RED}
-        self._status_lbl.setText(msg[-60:] if len(msg) > 60 else msg)
+        self._status_lbl.setText(msg[-58:] if len(msg) > 58 else msg)
         self._status_lbl.setStyleSheet(
-            f"color: {colors.get(level, TEXT_DIM)}; font-size: 11px; font-family: monospace;"
+            f"color: {colors.get(level, TEXT_MID)}; font-size: 11px; font-family: {FONT_MONO};"
         )
         self._status_dot._color = QColor(dot_colors.get(level, CYAN))
         if level in ("ok", "warn", "error"):
@@ -178,30 +192,28 @@ class HeaderWidget(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
 
-        # Dark gradient background
+        # Subtle horizontal gradient background
         grad = QLinearGradient(0, 0, w, 0)
-        grad.setColorAt(0.0, QColor("#08081a"))
-        grad.setColorAt(0.4, QColor("#0a0a18"))
-        grad.setColorAt(1.0, QColor("#06060f"))
+        grad.setColorAt(0.0, QColor("#0b1322"))
+        grad.setColorAt(0.5, QColor("#0a0f1b"))
+        grad.setColorAt(1.0, QColor("#080c16"))
         p.fillRect(self.rect(), grad)
 
-        # Subtle bottom border with cyan glow
-        p.setPen(QPen(QColor(CYAN + "30"), 1))
-        p.drawLine(0, h - 1, w, h - 1)
+        # Soft cyan glow behind the brand (top-left)
+        glow = QRadialGradient(70, h / 2, 220)
+        gc = QColor(CYAN); gc.setAlpha(26); glow.setColorAt(0.0, gc)
+        glow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setBrush(QBrush(glow)); p.setPen(Qt.PenStyle.NoPen)
+        p.drawRect(self.rect())
 
-        # Faint hex grid pattern (decorative)
-        p.setPen(QPen(QColor("#ffffff06"), 1))
-        hex_r = 14
-        for row in range(4):
-            for col in range(w // (hex_r * 3) + 2):
-                offset = (hex_r * 1.5) if row % 2 else 0
-                hx = col * hex_r * 3 + offset - hex_r
-                hy = row * hex_r * 1.73 - hex_r * 0.5
-                pts = []
-                for i in range(6):
-                    a = math.radians(60 * i)
-                    pts.append(QPointF(hx + hex_r * math.cos(a), hy + hex_r * math.sin(a)))
-                p.drawPolygon(QPolygonF(pts))
+        # Gradient bottom border: transparent → cyan → indigo → transparent
+        border = QLinearGradient(0, 0, w, 0)
+        border.setColorAt(0.0, QColor(0, 0, 0, 0))
+        c1 = QColor(CYAN); c1.setAlpha(150); border.setColorAt(0.25, c1)
+        c2 = QColor(PURPLE); c2.setAlpha(150); border.setColorAt(0.6, c2)
+        border.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setPen(QPen(QBrush(border), 1.5))
+        p.drawLine(0, h - 1, w, h - 1)
 
 
 # ── Disclaimer dialog ─────────────────────────────────────────────────────────

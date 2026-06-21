@@ -15,7 +15,7 @@ from PyQt6.QtGui import QImage, QPixmap, QDragEnterEvent, QDropEvent, QFont, QAc
 
 from .theme import (
     CYAN, CYAN_DIM, GREEN, RED, AMBER, PURPLE, TEXT_MID, TEXT_LO, TEXT_DIM,
-    BG_CARD, BG_CARD2, BG_VOID, BG_SURFACE, BORDER_MID, TEXT_HI,
+    BG_CARD, BG_CARD2, BG_VOID, BG_SURFACE, BORDER_MID, TEXT_HI, rgba,
 )
 from .widgets import ConfidenceDial, GlowScoreBar, TimelineGraph, glow_effect
 from ..detection.detector import DeepfakeDetector, DetectionResult
@@ -155,8 +155,8 @@ class DropZone(QLabel):
 
     def _hover_style(self):
         self.setStyleSheet(
-            f"border: 2px dashed {CYAN_DIM}; border-radius: 12px; "
-            f"background: {CYAN}11; color: {CYAN}; padding: 16px;"
+            f"border: 2px dashed {CYAN}; border-radius: 12px; "
+            f"background: {rgba(CYAN, 0.08)}; color: {CYAN}; padding: 16px;"
         )
 
     def dragEnterEvent(self, e: QDragEnterEvent):

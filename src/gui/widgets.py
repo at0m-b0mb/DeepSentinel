@@ -15,7 +15,7 @@ from .theme import (
     CYAN, CYAN_MID, CYAN_DIM, GREEN, GREEN_LO, RED, RED_DIM,
     AMBER, PURPLE, BG_CARD, BG_CARD2, BG_HOVER, BG_DEEP, BG_VOID,
     BORDER_MID, BORDER_HI, TEXT_HI, TEXT_MID, TEXT_LO, TEXT_DIM,
-    FONT_MONO, FONT_UI,
+    FONT_MONO, FONT_UI, rgba,
 )
 
 
@@ -56,7 +56,7 @@ class ConfidenceDial(QWidget):
         self._timer.setInterval(14)
         self._timer.timeout.connect(self._step)
 
-        self.setMinimumSize(240, 155)
+        self.setMinimumSize(240, 178)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -155,25 +155,32 @@ class ConfidenceDial(QWidget):
             oy = cy - (r + 4) * math.sin(angle)
             p.drawLine(QPointF(ix, iy), QPointF(ox, oy))
 
+        # Percentage + label stacked in the open lower-centre of the arc,
+        # sized relative to the radius so they never overlap at any scale.
+        pct_px = max(18, int(r * 0.30))
+        lbl_px = max(8, int(r * 0.092))
+
         # Percentage text
         p.setPen(self._color)
         f_pct = QFont()
         f_pct.setFamily("JetBrains Mono, Menlo, monospace")
-        f_pct.setPointSize(28)
+        f_pct.setPixelSize(pct_px)
         f_pct.setBold(True)
         p.setFont(f_pct)
-        p.drawText(QRectF(0, cy - r * 0.72, w, r * 0.55),
+        pct_h = pct_px * 1.2
+        pct_top = cy - r * 0.66
+        p.drawText(QRectF(0, pct_top, w, pct_h),
                    Qt.AlignmentFlag.AlignCenter, self._pct_text)
 
-        # Label text
+        # Label text — placed clearly below the percentage block
         p.setPen(QColor(TEXT_LO))
         f_lbl = QFont()
         f_lbl.setFamily("SF Pro Display, Helvetica, sans-serif")
-        f_lbl.setPointSize(8)
+        f_lbl.setPixelSize(lbl_px)
         f_lbl.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.5)
         f_lbl.setBold(True)
         p.setFont(f_lbl)
-        p.drawText(QRectF(0, cy - r * 0.2, w, 18),
+        p.drawText(QRectF(0, pct_top + pct_h + 2, w, lbl_px * 1.8),
                    Qt.AlignmentFlag.AlignCenter, self._label)
 
 
@@ -501,7 +508,7 @@ class HistoryRow(QWidget):
         verdict_lbl = QLabel(verdict)
         verdict_lbl.setStyleSheet(
             f"color: {color}; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; "
-            f"background: {color}20; border-radius: 4px; padding: 2px 6px;"
+            f"background: {rgba(color, 0.13)}; border-radius: 5px; padding: 2px 6px;"
         )
         verdict_lbl.setFixedWidth(90)
         verdict_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
