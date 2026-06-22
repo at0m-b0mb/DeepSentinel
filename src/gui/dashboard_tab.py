@@ -11,7 +11,7 @@ from .theme import (
     CYAN, GREEN, RED, AMBER, PURPLE, TEXT_MID, TEXT_LO, TEXT_DIM,
     BG_CARD, BG_CARD2, BORDER_MID, TEXT_HI, BG_HOVER,
 )
-from .widgets import StatCard, HistoryRow, glow_effect
+from .widgets import StatCard, HistoryRow, VerdictDonut, glow_effect
 
 
 class DashboardTab(QWidget):
@@ -62,11 +62,16 @@ class DashboardTab(QWidget):
 
         root.addLayout(cards_row)
 
-        # Middle row: history + quick actions
+        # Middle row: history | (donut + quick actions)
         mid = QHBoxLayout()
         mid.setSpacing(16)
         mid.addWidget(self._build_history_panel(), 3)
-        mid.addWidget(self._build_quick_actions(), 1)
+
+        right_col = QVBoxLayout()
+        right_col.setSpacing(16)
+        right_col.addWidget(self._build_donut_panel())
+        right_col.addWidget(self._build_quick_actions(), 1)
+        mid.addLayout(right_col, 2)
         root.addLayout(mid, 1)
 
         # Bottom: tips
@@ -122,6 +127,52 @@ class DashboardTab(QWidget):
 
         self._scroll.setWidget(self._history_container)
         layout.addWidget(self._scroll, 1)
+        return panel
+
+    def _build_donut_panel(self) -> QFrame:
+        panel = QFrame()
+        panel.setObjectName("card")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
+
+        title = QLabel("VERDICT BREAKDOWN")
+        title.setObjectName("sectionHeader")
+        layout.addWidget(title)
+
+        body = QHBoxLayout()
+        body.setSpacing(14)
+
+        self.donut = VerdictDonut()
+        self.donut.setMinimumSize(130, 130)
+        body.addWidget(self.donut, 1)
+
+        # Legend
+        legend = QVBoxLayout()
+        legend.setSpacing(10)
+        legend.addStretch()
+        self._legend_lbls = {}
+        for key, name, color in [("real", "Authentic", GREEN),
+                                  ("suspicious", "Suspicious", AMBER),
+                                  ("fakes", "Deepfake", RED)]:
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {color}; font-size: 13px;")
+            row.addWidget(dot)
+            nm = QLabel(name)
+            nm.setStyleSheet(f"color: {TEXT_MID}; font-size: 12px;")
+            row.addWidget(nm)
+            row.addStretch()
+            val = QLabel("0")
+            val.setStyleSheet(f"color: {TEXT_HI}; font-size: 12px; font-weight: 800; font-family: monospace;")
+            row.addWidget(val)
+            self._legend_lbls[key] = val
+            legend.addLayout(row)
+        legend.addStretch()
+        body.addLayout(legend, 1)
+
+        layout.addLayout(body)
         return panel
 
     def _build_quick_actions(self) -> QFrame:
@@ -271,6 +322,11 @@ class DashboardTab(QWidget):
         self.card_fakes.set_value(str(self._stats["fakes"]))
         self.card_susp.set_value(str(self._stats["suspicious"]))
         self.card_real.set_value(str(self._stats["real"]))
+        # Donut + legend
+        self.donut.set_counts(self._stats["real"], self._stats["suspicious"], self._stats["fakes"])
+        self._legend_lbls["real"].setText(str(self._stats["real"]))
+        self._legend_lbls["suspicious"].setText(str(self._stats["suspicious"]))
+        self._legend_lbls["fakes"].setText(str(self._stats["fakes"]))
 
     def _update_clock(self):
         elapsed = datetime.datetime.now() - self._session_start

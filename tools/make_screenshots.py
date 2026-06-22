@@ -43,6 +43,13 @@ def bgr_to_pix(bgr, w, h):
 
 
 def grab(widget, app, name):
+    # Clear any in-flight page-fade effect so the grab renders at full opacity
+    try:
+        page = widget.stack.currentWidget()
+        if page is not None:
+            page.setGraphicsEffect(None)
+    except Exception:
+        pass
     for _ in range(6):
         app.processEvents()
     pix = widget.grab()
@@ -85,8 +92,23 @@ def main():
     ]
     for name, verdict, score in samples:
         dash.record_analysis(name, verdict, score)
+    # Freeze the donut animation to its final state for the grab
+    dash.donut._anim = dict(dash.donut._counts)
+    if dash.donut._timer.isActive():
+        dash.donut._timer.stop()
+    dash.donut.update()
     win._goto(0)
+    # Showcase a toast notification
+    win._toast("Analysis complete · ceo_announcement.jpg → AUTHENTIC 91%", "ok")
     grab(win, app, "dashboard.png")
+    # Clear toasts so they don't bleed into later screenshots
+    for t in list(getattr(win, "_toasts", [])):
+        t.hide()
+        t.setParent(None)
+        t.deleteLater()
+    win._toasts = []
+    for _ in range(6):
+        app.processEvents()
 
     # ── LIVE DETECTION ─────────────────────────────────────────────────────────
     live = win.live_tab
@@ -100,6 +122,7 @@ def main():
                                  "overall_score": demo_score})()
     annotated = _draw_live_overlay(portrait, demo_result)
     live.cam_lbl.setPixmap(bgr_to_pix(annotated, 560, 420))
+    live.cam_stack.setCurrentIndex(1)   # show running feed (not idle placeholder)
     live.dial.set_result(demo_score); freeze_dial(live.dial)
     flabel, fconf, fcolor = verdict_view(demo_score)
     live.verdict_lbl.setText(flabel)

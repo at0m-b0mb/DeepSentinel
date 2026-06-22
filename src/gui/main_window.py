@@ -6,7 +6,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QDialog, QPushButton, QTextEdit,
     QMessageBox, QFrame, QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, pyqtSignal
+from PyQt6.QtCore import (
+    Qt, QTimer, QRectF, QPointF, pyqtSignal,
+    QPropertyAnimation, QEasingCurve,
+)
+from PyQt6.QtWidgets import QGraphicsOpacityEffect
 from PyQt6.QtGui import (
     QFont, QAction, QPainter, QPen, QColor, QLinearGradient,
     QBrush, QConicalGradient, QRadialGradient, QPainterPath, QPolygonF,
@@ -18,7 +22,7 @@ from .theme import (
     BG_VOID, BG_DEEP, BG_CARD, BG_CARD2, BORDER_MID, BORDER_HI, BORDER_CYAN,
     FONT_MONO, FONT_UI, rgba,
 )
-from .widgets import PulsingDot, glow_effect
+from .widgets import PulsingDot, Toast, glow_effect
 from ..detection.detector import DeepfakeDetector
 from .live_tab import LiveTab
 from .analyze_tab import AnalyzeTab
@@ -511,6 +515,45 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(index)
         self.sidebar.select(index)
         self.topbar.set_page(index)
+        self._fade_current_page()
+
+    def _fade_current_page(self):
+        """Subtle fade-in of the freshly shown page."""
+        page = self.stack.currentWidget()
+        if page is None:
+            return
+        try:
+            fx = QGraphicsOpacityEffect(page)
+            page.setGraphicsEffect(fx)
+            anim = QPropertyAnimation(fx, b"opacity", self)
+            anim.setDuration(190)
+            anim.setStartValue(0.35)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            # Drop the effect when done so nested glow effects render normally
+            anim.finished.connect(lambda: page.setGraphicsEffect(None))
+            anim.start()
+            self._page_anim = anim   # keep a ref
+        except Exception:
+            page.setGraphicsEffect(None)
+
+    # ── Toast notifications ───────────────────────────────────────────────────
+    def _toast(self, message: str, kind: str = "info"):
+        if not hasattr(self, "_toasts"):
+            self._toasts = []
+        toast = Toast(self, message, kind)
+        self._toasts.append(toast)
+        toast.destroyed.connect(lambda *_: self._toasts.remove(toast) if toast in self._toasts else None)
+        margin = 20
+        x = self.width() - toast.width() - margin
+        y = 92
+        for existing in self._toasts[:-1]:
+            try:
+                if existing.isVisible():
+                    y += existing.height() + 10
+            except RuntimeError:
+                pass
+        toast.show_at(x, y)
 
     def _build_menu(self):
         mb = self.menuBar()
@@ -544,10 +587,16 @@ class MainWindow(QMainWindow):
 
     # ── Signals ───────────────────────────────────────────────────────────────
     def _on_status(self, msg: str):
-        level = "ok" if "complete" in msg.lower() else (
-            "error" if "error" in msg.lower() or "fail" in msg.lower() else "info")
+        low = msg.lower()
+        level = "ok" if "complete" in low or "saved" in low or "installed" in low else (
+            "error" if "error" in low or "fail" in low else "info")
         self.sidebar.set_status(msg, level)
         self.statusBar().showMessage(msg, 5000)
+        # Surface notable events as toasts (skip chatty progress messages)
+        notable = any(k in low for k in
+                      ("complete", "saved", "exported", "installed", "error", "fail", "snapshot"))
+        if notable:
+            self._toast(msg, level)
 
     def _on_snapshot(self, frame):
         """Live tab sent a snapshot — load into analyze tab and switch to it."""

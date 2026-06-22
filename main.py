@@ -56,6 +56,12 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
+    # Window / dock icon
+    from PyQt6.QtGui import QIcon
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+
     # Apply base font
     font = QFont("SF Pro Display", 13)
     font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)

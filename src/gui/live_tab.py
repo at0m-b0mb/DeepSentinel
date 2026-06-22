@@ -8,6 +8,7 @@ import cv2
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QFrame, QCheckBox, QGroupBox, QSizePolicy, QFileDialog, QSplitter,
+    QStackedWidget,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QImage, QPixmap, QFont
@@ -16,7 +17,10 @@ from .theme import (
     CYAN, GREEN, RED, AMBER, TEXT_MID, TEXT_LO, TEXT_DIM,
     BG_CARD, BORDER_MID, BG_VOID,
 )
-from .widgets import ConfidenceDial, HistoryGraph, GlowScoreBar, PulsingDot, glow_effect, verdict_view
+from .widgets import (
+    ConfidenceDial, HistoryGraph, GlowScoreBar, PulsingDot, CameraPlaceholder,
+    glow_effect, verdict_view,
+)
 from ..detection.detector import DeepfakeDetector, DetectionResult
 
 
@@ -183,16 +187,19 @@ class LiveTab(QWidget):
         hdr.addWidget(self._frame_cnt_lbl)
         layout.addLayout(hdr)
 
-        # Camera view
+        # Camera view — idle placeholder swaps with live feed
+        self.cam_stack = QStackedWidget()
+        self.cam_stack.setMinimumHeight(280)
+        self.cam_placeholder = CameraPlaceholder()
         self.cam_lbl = QLabel()
         self.cam_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cam_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.cam_lbl.setStyleSheet(
             f"background: {BG_VOID}; border: 1px solid {BORDER_MID}; border-radius: 10px;"
         )
-        self.cam_lbl.setText("Camera not started")
-        self.cam_lbl.setMinimumHeight(280)
-        layout.addWidget(self.cam_lbl, 1)
+        self.cam_stack.addWidget(self.cam_placeholder)   # index 0
+        self.cam_stack.addWidget(self.cam_lbl)           # index 1
+        layout.addWidget(self.cam_stack, 1)
 
         # Controls row
         ctrl = QHBoxLayout()
@@ -327,6 +334,7 @@ class LiveTab(QWidget):
         self.worker.fps_update.connect(lambda f: self._fps_lbl.setText(f"FPS: {f:.1f}"))
         self.worker.start()
 
+        self.cam_stack.setCurrentIndex(1)   # show live feed
         self.start_btn.setText("■  Stop Detection")
         self.start_btn.setObjectName("dangerBtn")
         self.start_btn.setStyle(self.start_btn.style())
@@ -345,7 +353,7 @@ class LiveTab(QWidget):
         self.snap_btn.setEnabled(False)
         self.save_btn.setEnabled(False)
         self._pulse.stop()
-        self.cam_lbl.setText("Camera stopped")
+        self.cam_stack.setCurrentIndex(0)   # back to idle placeholder
         self.cam_lbl.setPixmap(QPixmap())
         self._fps_lbl.setText("FPS: —")
         self.dial.reset()

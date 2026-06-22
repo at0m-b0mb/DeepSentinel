@@ -3,9 +3,12 @@
 import math
 from PyQt6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy,
-    QGraphicsDropShadowEffect,
+    QGraphicsDropShadowEffect, QGraphicsOpacityEffect,
 )
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF
+from PyQt6.QtCore import (
+    Qt, QTimer, QRectF, QPointF, QPropertyAnimation, QEasingCurve,
+    QPoint, pyqtProperty,
+)
 from PyQt6.QtGui import (
     QPainter, QPen, QColor, QFont, QLinearGradient, QPainterPath,
     QRadialGradient, QConicalGradient, QBrush,
@@ -652,3 +655,223 @@ class TimelineGraph(QWidget):
             t = frac * dur
             p.drawText(QRectF(x - 20, h - pb + 3, 40, 14),
                        Qt.AlignmentFlag.AlignCenter, f"{t:.1f}s")
+
+
+# ── Verdict Distribution Donut ─────────────────────────────────────────────────
+
+class VerdictDonut(QWidget):
+    """Animated donut chart of REAL / SUSPICIOUS / DEEPFAKE session counts."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._counts = {"real": 0, "suspicious": 0, "fakes": 0}
+        self._anim = {"real": 0.0, "suspicious": 0.0, "fakes": 0.0}
+        self.setMinimumHeight(150)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._timer = QTimer(self)
+        self._timer.setInterval(16)
+        self._timer.timeout.connect(self._step)
+
+    def set_counts(self, real: int, suspicious: int, fakes: int):
+        self._counts = {"real": real, "suspicious": suspicious, "fakes": fakes}
+        if not self._timer.isActive():
+            self._timer.start()
+
+    def _step(self):
+        done = True
+        for k in self._anim:
+            diff = self._counts[k] - self._anim[k]
+            if abs(diff) < 0.02:
+                self._anim[k] = self._counts[k]
+            else:
+                self._anim[k] += diff * 0.18
+                done = False
+        self.update()
+        if done:
+            self._timer.stop()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        size = min(w, h) - 12
+        cx, cy = w / 2, h / 2
+        rect = QRectF(cx - size / 2, cy - size / 2, size, size)
+        thickness = max(14, size * 0.16)
+
+        total = sum(self._anim.values())
+        # Track
+        track = QPen(QColor("#10182a"), thickness)
+        track.setCapStyle(Qt.PenCapStyle.FlatCap)
+        p.setPen(track)
+        p.drawArc(rect, 0, 360 * 16)
+
+        if total <= 0:
+            p.setPen(QColor(TEXT_DIM))
+            f = QFont(); f.setPointSize(10); p.setFont(f)
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No data yet")
+            return
+
+        segs = [("real", QColor(GREEN)), ("suspicious", QColor(AMBER)), ("fakes", QColor(RED))]
+        start = 90 * 16   # start at top
+        for key, color in segs:
+            frac = self._anim[key] / total
+            span = -int(frac * 360 * 16)
+            if span == 0:
+                continue
+            pen = QPen(color, thickness)
+            pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+            p.setPen(pen)
+            p.drawArc(rect, start, span)
+            start += span
+
+        # Center total + label
+        p.setPen(QColor(TEXT_HI))
+        fbig = QFont(); fbig.setFamily("JetBrains Mono, monospace"); fbig.setPointSize(int(size * 0.16)); fbig.setBold(True)
+        p.setFont(fbig)
+        p.drawText(QRectF(cx - size / 2, cy - size * 0.28, size, size * 0.34),
+                   Qt.AlignmentFlag.AlignCenter, str(int(round(total))))
+        p.setPen(QColor(TEXT_LO))
+        fsm = QFont(); fsm.setPointSize(8); fsm.setBold(True)
+        fsm.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        p.setFont(fsm)
+        p.drawText(QRectF(cx - size / 2, cy + size * 0.04, size, 16),
+                   Qt.AlignmentFlag.AlignCenter, "ANALYZED")
+
+
+# ── Camera idle placeholder ────────────────────────────────────────────────────
+
+class CameraPlaceholder(QWidget):
+    """Attractive idle state shown in the live-camera area before it starts."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(280)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._phase = 0.0
+        self._timer = QTimer(self)
+        self._timer.setInterval(40)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start()
+
+    def _tick(self):
+        self._phase = (self._phase + 0.03) % (2 * math.pi)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        # Background
+        p.setBrush(QColor(BG_VOID)); p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(QRectF(0, 0, w, h), 12, 12)
+
+        cx, cy = w / 2, h / 2 - 18
+        r = 46
+
+        # Pulsing concentric scan rings
+        for i, ring in enumerate([1.0, 1.5, 2.1]):
+            pulse = (math.sin(self._phase - i * 0.7) + 1) / 2
+            col = QColor(CYAN); col.setAlpha(int(20 + pulse * 45))
+            p.setPen(QPen(col, 1.5)); p.setBrush(Qt.BrushStyle.NoBrush)
+            rr = r * ring
+            p.drawEllipse(QPointF(cx, cy), rr, rr)
+
+        # Hex eye
+        hexpts = [QPointF(cx + r * math.cos(math.radians(60 * i - 30)),
+                          cy + r * math.sin(math.radians(60 * i - 30))) for i in range(6)]
+        grad = QConicalGradient(cx, cy, math.degrees(self._phase) * 2)
+        grad.setColorAt(0.0, QColor(CYAN)); grad.setColorAt(0.5, QColor(PURPLE)); grad.setColorAt(1.0, QColor(CYAN))
+        from PyQt6.QtGui import QPolygonF
+        p.setPen(QPen(QBrush(grad), 2.4)); p.setBrush(QColor(rgba_to_qcolor(CYAN, 0.06)))
+        p.drawPolygon(QPolygonF(hexpts))
+        # eye + pupil
+        p.setPen(QPen(QColor(CYAN), 1.6)); p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QRectF(cx - r * 0.55, cy - r * 0.22, r * 1.1, r * 0.44))
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor(CYAN))
+        p.drawEllipse(QPointF(cx, cy), r * 0.16, r * 0.16)
+
+        # Title + hint
+        p.setPen(QColor(TEXT_HI))
+        ft = QFont(); ft.setPointSize(14); ft.setBold(True); ft.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.0)
+        p.setFont(ft)
+        p.drawText(QRectF(0, cy + r + 18, w, 30), Qt.AlignmentFlag.AlignHCenter, "Camera Ready")
+        p.setPen(QColor(TEXT_LO))
+        fh = QFont(); fh.setPointSize(10); p.setFont(fh)
+        p.drawText(QRectF(0, cy + r + 46, w, 24), Qt.AlignmentFlag.AlignHCenter,
+                   "Press  ▶  Start Detection  to analyze your webcam in real time")
+        p.setPen(QColor(TEXT_DIM))
+        fd = QFont(); fd.setPointSize(9); p.setFont(fd)
+        p.drawText(QRectF(0, cy + r + 70, w, 20), Qt.AlignmentFlag.AlignHCenter,
+                   "Well-lit, front-facing footage gives the most reliable results")
+
+
+def rgba_to_qcolor(hex6: str, alpha: float) -> QColor:
+    h = hex6.lstrip("#")
+    c = QColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    c.setAlphaF(alpha)
+    return c
+
+
+# ── Toast notification ─────────────────────────────────────────────────────────
+
+class Toast(QFrame):
+    """Self-dismissing notification card that slides in from the top-right."""
+
+    def __init__(self, parent, message: str, kind: str = "info", duration: int = 3200):
+        super().__init__(parent)
+        accents = {"info": CYAN, "ok": GREEN, "warn": AMBER, "error": RED}
+        icons = {"info": "ℹ", "ok": "✓", "warn": "⚠", "error": "✕"}
+        accent = accents.get(kind, CYAN)
+        icon = icons.get(kind, "ℹ")
+
+        self.setObjectName("toast")
+        self.setStyleSheet(
+            f"#toast {{ background: {BG_CARD2}; border: 1px solid {rgba(accent, 0.45)}; "
+            f"border-left: 3px solid {accent}; border-radius: 12px; }}"
+        )
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(14, 11, 16, 11)
+        lay.setSpacing(11)
+
+        ic = QLabel(icon)
+        ic.setStyleSheet(f"color: {accent}; font-size: 16px; font-weight: 900; background: transparent;")
+        lay.addWidget(ic)
+
+        msg = QLabel(message)
+        msg.setStyleSheet(f"color: {TEXT_HI}; font-size: 12px; font-weight: 600; background: transparent;")
+        msg.setWordWrap(True)
+        msg.setMaximumWidth(280)
+        lay.addWidget(msg)
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(28); shadow.setColor(QColor(0, 0, 0, 160)); shadow.setOffset(0, 6)
+        self.setGraphicsEffect(shadow)
+
+        self.adjustSize()
+        self._duration = duration
+
+    def show_at(self, x: int, y: int):
+        self.move(x + 30, y)            # start slightly off to the right
+        self.show()
+        self.raise_()
+        end = QPoint(x, y)
+        self._slide = QPropertyAnimation(self, b"pos", self)
+        self._slide.setDuration(260)
+        self._slide.setStartValue(QPoint(x + 30, y))
+        self._slide.setEndValue(end)
+        self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._slide.start()
+        QTimer.singleShot(self._duration, self._dismiss)
+
+    def _dismiss(self):
+        self._fx = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self._fx)
+        self._fade = QPropertyAnimation(self._fx, b"opacity", self)
+        self._fade.setDuration(280)
+        self._fade.setStartValue(1.0)
+        self._fade.setEndValue(0.0)
+        self._fade.finished.connect(self.deleteLater)
+        self._fade.start()

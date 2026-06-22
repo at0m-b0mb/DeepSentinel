@@ -156,10 +156,10 @@ and learn exactly how deepfakes work under the hood.
       <h3>◈ Session Dashboard</h3>
       <ul>
         <li>Live stats: Files Analyzed, Deepfakes, Suspicious, Real</li>
-        <li>Session timer with history log</li>
-        <li>Recent analyses: timestamp, filename, verdict, score</li>
-        <li>Quick-action buttons to jump between tabs</li>
-        <li>System info: OpenCV, PyTorch, MPS/CUDA status</li>
+        <li>Animated <b>verdict-breakdown donut</b> chart</li>
+        <li>Session timer with scrolling history log</li>
+        <li><b>Toast notifications</b> for completed analyses & events</li>
+        <li>Quick-action buttons to jump between pages</li>
       </ul>
     </td>
     <td width="50%" valign="top">
