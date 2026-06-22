@@ -17,7 +17,7 @@ from .theme import (
     CYAN, CYAN_DIM, GREEN, RED, AMBER, PURPLE, TEXT_MID, TEXT_LO, TEXT_DIM,
     BG_CARD, BG_CARD2, BG_VOID, BG_SURFACE, BORDER_MID, TEXT_HI, rgba,
 )
-from .widgets import ConfidenceDial, GlowScoreBar, TimelineGraph, glow_effect
+from .widgets import ConfidenceDial, GlowScoreBar, TimelineGraph, glow_effect, verdict_view
 from ..detection.detector import DeepfakeDetector, DetectionResult
 from ..detection.metadata import extract_metadata, flag_suspicious
 from ..detection.heatmap import suspicion_heatmap
@@ -653,15 +653,15 @@ class AnalyzeTab(QWidget):
         self.export_btn.setEnabled(True)
         self._last_result = r
 
-        colors = {"REAL": GREEN, "SUSPICIOUS": AMBER, "DEEPFAKE": RED}
-        color = colors.get(r.label, TEXT_MID)
+        flabel, conf, qcolor = verdict_view(r.overall_score)
+        color = qcolor.name()
 
-        self.dial.set_value(r.overall_score, r.label)
-        self.verdict_lbl.setText(r.label)
+        self.dial.set_result(r.overall_score)
+        self.verdict_lbl.setText(flabel)
         self.verdict_lbl.setStyleSheet(
-            f"color: {color}; letter-spacing: 5px; font-size: 16px; font-weight: 900;"
+            f"color: {color}; letter-spacing: 4px; font-size: 17px; font-weight: 900;"
         )
-        self.conf_lbl.setText(f"Confidence: {r.confidence_pct:.1f}%")
+        self.conf_lbl.setText(f"{conf*100:.0f}% confidence  ·  raw score {r.overall_score:.2f}")
         self.conf_lbl.setStyleSheet(f"color: {color}; font-size: 12px;")
 
         self.bar_fft.set_score(r.fft_score)

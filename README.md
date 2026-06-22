@@ -87,11 +87,11 @@ and learn exactly how deepfakes work under the hood.
     <td width="50%" valign="top">
       <h3>🎥 Live Webcam Detection</h3>
       <ul>
-        <li>Real-time face detection on webcam feed</li>
-        <li>Animated <b>arc confidence gauge</b> with smooth animation</li>
-        <li>Scrolling <b>live confidence history graph</b></li>
-        <li>Per-method score breakdown updated every frame</li>
-        <li><b>Snapshot → Analyze</b>: freeze any frame for full forensic analysis</li>
+        <li><b>HD (720p) capture</b> with a sharp full-resolution overlay</li>
+        <li>Clear verdicts — <b>"AUTHENTIC 92%"</b>, not a confusing "8%"</li>
+        <li><b>Temporal smoothing</b> keeps the verdict from flickering</li>
+        <li>Animated <b>arc confidence gauge</b> + live history graph</li>
+        <li><b>Snapshot → Analyze</b>: freeze any frame for full forensics</li>
         <li>FPS counter, save-frame button, start/stop toggle</li>
       </ul>
     </td>
@@ -246,7 +246,7 @@ DeepSentinel/
 │       ├── theme.py               # Dark cyberpunk QSS stylesheet + palette
 │       ├── widgets.py             # ConfidenceDial · HistoryGraph · TimelineGraph
 │       │                          #   GlowScoreBar · StatCard · PulsingDot
-│       ├── main_window.py         # Animated HexLogo · HeaderWidget · tab host
+│       ├── main_window.py         # Sidebar app-shell · NavSidebar · TopBar · pages
 │       ├── dashboard_tab.py       # Session stats + history + quick actions
 │       ├── live_tab.py            # Webcam feed + CameraWorker QThread
 │       ├── analyze_tab.py         # Static analysis + heatmap + temporal + EXIF
@@ -287,16 +287,19 @@ python main.py
 
 ### Optional — MesoNet Neural Network
 
+**Easiest:** open **Settings → MesoNet** and click **⬇ Install PyTorch (one-click)**.
+It installs `torch` + `torchvision` in the background with a live log, then prompts a restart.
+
+Prefer the command line?
+
 ```bash
-# Install PyTorch (Apple Silicon / MPS)
+# Install PyTorch (Apple Silicon / MPS or CPU)
 pip install torch torchvision
 
 # Install PyTorch (CUDA GPU)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-# Download pretrained Meso4 weights:
-# https://github.com/DariusAf/MesoNet
-# Then load via: Settings → MesoNet → Browse
+# Pretrained Meso4 weights: Settings → MesoNet → "Get weights ↗" → Browse
 ```
 
 ---

@@ -2,11 +2,11 @@
 
 import math
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QTabWidget, QStatusBar, QLabel,
+    QMainWindow, QWidget, QStackedWidget, QButtonGroup, QStatusBar, QLabel,
     QVBoxLayout, QHBoxLayout, QDialog, QPushButton, QTextEdit,
     QMessageBox, QFrame, QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, pyqtSignal
 from PyQt6.QtGui import (
     QFont, QAction, QPainter, QPen, QColor, QLinearGradient,
     QBrush, QConicalGradient, QRadialGradient, QPainterPath, QPolygonF,
@@ -104,83 +104,155 @@ class HexLogo(QWidget):
         p.drawEllipse(QPointF(cx + eye_h * 0.12, cy - eye_h * 0.12), eye_h * 0.07, eye_h * 0.07)
 
 
-# ── Header widget ─────────────────────────────────────────────────────────────
+# ── Sidebar navigation ────────────────────────────────────────────────────────
 
-class HeaderWidget(QWidget):
+class NavButton(QPushButton):
+    """Checkable sidebar nav item — painted icon + label with an active accent bar."""
+
+    def __init__(self, icon: str, label: str, parent=None):
+        super().__init__(parent)
+        self._icon = icon
+        self._label = label
+        self._hover = False
+        self.setObjectName("navBtn")
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(46)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    def enterEvent(self, e):
+        self._hover = True; self.update()
+
+    def leaveEvent(self, e):
+        self._hover = False; self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        checked = self.isChecked()
+
+        # Pill background
+        if checked:
+            grad = QLinearGradient(0, 0, w, 0)
+            c0 = QColor(CYAN); c0.setAlpha(34); grad.setColorAt(0.0, c0)
+            c1 = QColor(PURPLE); c1.setAlpha(16); grad.setColorAt(1.0, c1)
+            p.setBrush(QBrush(grad)); p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(QRectF(4, 3, w - 8, h - 6), 11, 11)
+        elif self._hover:
+            p.setBrush(QColor(BG_HOVER)); p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(QRectF(4, 3, w - 8, h - 6), 11, 11)
+
+        # Active accent bar (left)
+        if checked:
+            p.setBrush(QColor(CYAN)); p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(QRectF(4, h / 2 - 11, 3.5, 22), 2, 2)
+
+        # Icon
+        icon_color = QColor(CYAN) if checked else QColor(TEXT_LO if not self._hover else TEXT_MID)
+        fi = QFont(); fi.setPointSize(14)
+        p.setFont(fi); p.setPen(icon_color)
+        p.drawText(QRectF(16, 0, 28, h), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._icon)
+
+        # Label
+        fl = QFont(); fl.setFamily("SF Pro Display"); fl.setPointSize(12)
+        fl.setWeight(QFont.Weight.DemiBold if checked else QFont.Weight.Medium)
+        p.setFont(fl)
+        p.setPen(QColor(TEXT_HI) if checked else QColor(TEXT_MID if self._hover else TEXT_LO))
+        p.drawText(QRectF(50, 0, w - 56, h), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._label)
+
+
+class NavSidebar(QFrame):
+    """Left navigation rail: brand, nav items, and a status footer."""
+
+    navigate = pyqtSignal(int)
+
+    NAV_ITEMS = [
+        ("◈", "Dashboard"),
+        ("🎥", "Live Detection"),
+        ("🔍", "Analyze Media"),
+        ("🗂", "Batch Scan"),
+        ("📚", "How It Works"),
+        ("⚙", "Settings"),
+    ]
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(70)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFixedWidth(232)
+        self.setObjectName("navSidebar")
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(22, 0, 22, 0)
-        layout.setSpacing(14)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 22, 16, 18)
+        layout.setSpacing(0)
 
-        # Animated hex logo
-        self.logo = HexLogo(42)
-        layout.addWidget(self.logo)
+        # Brand
+        brand = QHBoxLayout()
+        brand.setSpacing(11)
+        self.logo = HexLogo(38)
+        brand.addWidget(self.logo)
+        bcol = QVBoxLayout(); bcol.setSpacing(0); bcol.setContentsMargins(0, 0, 0, 0)
+        name = QLabel("DEEP<span style='color:#eef2ff; font-weight:500'>SENTINEL</span>")
+        name.setTextFormat(Qt.TextFormat.RichText)
+        name.setStyleSheet(f"color: {CYAN}; font-size: 16px; font-weight: 900; letter-spacing: 2px;")
+        ver = QLabel("v1.0  ·  Forensic Suite")
+        ver.setStyleSheet(f"color: {TEXT_DIM}; font-size: 9px; letter-spacing: 1px;")
+        bcol.addWidget(name); bcol.addWidget(ver)
+        brand.addLayout(bcol)
+        brand.addStretch()
+        layout.addLayout(brand)
 
-        # Brand text block
-        brand_block = QWidget()
-        bl = QVBoxLayout(brand_block)
-        bl.setContentsMargins(0, 0, 0, 0)
-        bl.setSpacing(2)
+        layout.addSpacing(22)
+        nav_lbl = QLabel("NAVIGATION")
+        nav_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 9px; font-weight: 800; letter-spacing: 2.5px; padding-left: 8px;")
+        layout.addWidget(nav_lbl)
+        layout.addSpacing(8)
 
-        name_lbl = QLabel("DEEP<span style='color:#eef2ff; font-weight:500'>SENTINEL</span>")
-        name_lbl.setTextFormat(Qt.TextFormat.RichText)
-        name_lbl.setStyleSheet(
-            f"color: {CYAN}; font-size: 20px; font-weight: 900; "
-            f"letter-spacing: 3.5px; font-family: {FONT_UI};"
-        )
-        bl.addWidget(name_lbl)
+        # Nav buttons
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+        self._buttons: list[NavButton] = []
+        for i, (icon, label) in enumerate(self.NAV_ITEMS):
+            btn = NavButton(icon, label)
+            self._group.addButton(btn, i)
+            btn.clicked.connect(lambda _, idx=i: self.navigate.emit(idx))
+            layout.addWidget(btn)
+            layout.addSpacing(3)
+            self._buttons.append(btn)
 
-        tag_lbl = QLabel("Deepfake Detection & Education Platform")
-        tag_lbl.setStyleSheet(f"color: {TEXT_LO}; font-size: 11px; letter-spacing: 1.2px;")
-        bl.addWidget(tag_lbl)
-
-        layout.addWidget(brand_block)
         layout.addStretch()
 
-        # Status pill
-        self._status_pill = QFrame()
-        self._status_pill.setObjectName("card2")
-        sl = QHBoxLayout(self._status_pill)
-        sl.setContentsMargins(12, 6, 14, 6)
-        sl.setSpacing(8)
-
-        self._status_dot = PulsingDot(CYAN)
-        self._status_dot.stop()
-        sl.addWidget(self._status_dot)
-
+        # Footer: live status block
+        foot = QFrame(); foot.setObjectName("card2")
+        fl = QVBoxLayout(foot); fl.setContentsMargins(12, 10, 12, 10); fl.setSpacing(7)
+        srow = QHBoxLayout(); srow.setSpacing(8)
+        self._status_dot = PulsingDot(CYAN); self._status_dot.stop()
+        srow.addWidget(self._status_dot)
         self._status_lbl = QLabel("Ready")
-        self._status_lbl.setStyleSheet(f"color: {TEXT_MID}; font-size: 11px; font-family: {FONT_MONO};")
-        sl.addWidget(self._status_lbl)
-        layout.addWidget(self._status_pill)
+        self._status_lbl.setStyleSheet(f"color: {TEXT_MID}; font-size: 10px; font-family: {FONT_MONO};")
+        self._status_lbl.setWordWrap(True)
+        srow.addWidget(self._status_lbl, 1)
+        fl.addLayout(srow)
+        layout.addWidget(foot)
 
-        # version chip
-        ver = QLabel("v1.0")
-        ver.setStyleSheet(
-            f"color: {CYAN}; background: {rgba(CYAN, 0.08)}; border: 1px solid {rgba(CYAN, 0.30)}; "
-            f"border-radius: 8px; font-size: 10px; font-weight: 800; "
-            f"letter-spacing: 1px; padding: 5px 9px; font-family: {FONT_MONO};"
-        )
-        layout.addWidget(ver)
-
-        # Edu badge
+        layout.addSpacing(8)
         badge = QLabel("⚠  EDUCATIONAL USE ONLY")
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         badge.setStyleSheet(
             f"color: {AMBER}; background: {rgba(AMBER, 0.10)}; border: 1px solid {rgba(AMBER, 0.27)}; "
-            f"border-radius: 8px; font-size: 9px; font-weight: 800; "
-            f"letter-spacing: 1.5px; padding: 6px 10px;"
+            f"border-radius: 8px; font-size: 8.5px; font-weight: 800; letter-spacing: 1px; padding: 6px;"
         )
         layout.addWidget(badge)
+
+    def select(self, index: int):
+        if 0 <= index < len(self._buttons):
+            self._buttons[index].setChecked(True)
 
     def set_status(self, msg: str, level: str = "info"):
         colors = {"info": TEXT_MID, "ok": GREEN, "warn": AMBER, "error": RED}
         dot_colors = {"info": CYAN, "ok": GREEN, "warn": AMBER, "error": RED}
-        self._status_lbl.setText(msg[-58:] if len(msg) > 58 else msg)
+        self._status_lbl.setText(msg[-48:] if len(msg) > 48 else msg)
         self._status_lbl.setStyleSheet(
-            f"color: {colors.get(level, TEXT_MID)}; font-size: 11px; font-family: {FONT_MONO};"
+            f"color: {colors.get(level, TEXT_MID)}; font-size: 10px; font-family: {FONT_MONO};"
         )
         self._status_dot._color = QColor(dot_colors.get(level, CYAN))
         if level in ("ok", "warn", "error"):
@@ -191,28 +263,70 @@ class HeaderWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
-
-        # Subtle horizontal gradient background
-        grad = QLinearGradient(0, 0, w, 0)
+        # Vertical gradient
+        grad = QLinearGradient(0, 0, 0, h)
         grad.setColorAt(0.0, QColor("#0b1322"))
-        grad.setColorAt(0.5, QColor("#0a0f1b"))
-        grad.setColorAt(1.0, QColor("#080c16"))
+        grad.setColorAt(1.0, QColor("#070b13"))
         p.fillRect(self.rect(), grad)
-
-        # Soft cyan glow behind the brand (top-left)
-        glow = QRadialGradient(70, h / 2, 220)
-        gc = QColor(CYAN); gc.setAlpha(26); glow.setColorAt(0.0, gc)
+        # Top cyan glow
+        glow = QRadialGradient(w / 2, 40, 200)
+        gc = QColor(CYAN); gc.setAlpha(22); glow.setColorAt(0.0, gc)
         glow.setColorAt(1.0, QColor(0, 0, 0, 0))
-        p.setBrush(QBrush(glow)); p.setPen(Qt.PenStyle.NoPen)
-        p.drawRect(self.rect())
+        p.setBrush(QBrush(glow)); p.setPen(Qt.PenStyle.NoPen); p.drawRect(self.rect())
+        # Right border: faint cyan→indigo
+        border = QLinearGradient(0, 0, 0, h)
+        c1 = QColor(CYAN); c1.setAlpha(80); border.setColorAt(0.0, c1)
+        c2 = QColor(PURPLE); c2.setAlpha(60); border.setColorAt(1.0, c2)
+        p.setPen(QPen(QBrush(border), 1))
+        p.drawLine(w - 1, 0, w - 1, h)
 
-        # Gradient bottom border: transparent → cyan → indigo → transparent
-        border = QLinearGradient(0, 0, w, 0)
-        border.setColorAt(0.0, QColor(0, 0, 0, 0))
-        c1 = QColor(CYAN); c1.setAlpha(150); border.setColorAt(0.25, c1)
-        c2 = QColor(PURPLE); c2.setAlpha(150); border.setColorAt(0.6, c2)
-        border.setColorAt(1.0, QColor(0, 0, 0, 0))
-        p.setPen(QPen(QBrush(border), 1.5))
+
+class TopBar(QWidget):
+    """Slim content-area header: current page title + subtitle."""
+
+    PAGES = [
+        ("◈", "Dashboard", "Session overview & recent activity"),
+        ("🎥", "Live Detection", "Real-time webcam deepfake analysis"),
+        ("🔍", "Analyze Media", "Forensic analysis of images & videos"),
+        ("🗂", "Batch Scan", "Analyze an entire folder at once"),
+        ("📚", "How It Works", "The science behind deepfakes & detection"),
+        ("⚙", "Settings", "Methods, models & configuration"),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(64)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(26, 0, 24, 0)
+        layout.setSpacing(12)
+
+        self._icon = QLabel("◈")
+        self._icon.setStyleSheet(f"font-size: 20px; color: {CYAN};")
+        layout.addWidget(self._icon)
+
+        tcol = QVBoxLayout(); tcol.setSpacing(1); tcol.setContentsMargins(0, 0, 0, 0)
+        self._title = QLabel("Dashboard")
+        self._title.setStyleSheet(f"color: {TEXT_HI}; font-size: 18px; font-weight: 800; letter-spacing: 0.4px;")
+        self._subtitle = QLabel("Session overview & recent activity")
+        self._subtitle.setStyleSheet(f"color: {TEXT_LO}; font-size: 11px;")
+        tcol.addWidget(self._title); tcol.addWidget(self._subtitle)
+        layout.addLayout(tcol)
+        layout.addStretch()
+
+    def set_page(self, index: int):
+        if 0 <= index < len(self.PAGES):
+            icon, title, sub = self.PAGES[index]
+            self._icon.setText(icon)
+            self._title.setText(title)
+            self._subtitle.setText(sub)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        p.fillRect(self.rect(), QColor(BG_VOID))
+        # subtle bottom divider
+        p.setPen(QPen(QColor(BORDER_MID), 1))
         p.drawLine(0, h - 1, w, h - 1)
 
 
@@ -317,27 +431,33 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self):
         self.setWindowTitle("DeepSentinel — AI Deepfake Detection & Education")
-        self.setMinimumSize(1100, 750)
-        self.resize(1300, 860)
+        self.setMinimumSize(1160, 760)
+        self.resize(1340, 880)
 
         central = QWidget()
         self.setCentralWidget(central)
-        main_l = QVBoxLayout(central)
-        main_l.setContentsMargins(0, 0, 0, 0)
-        main_l.setSpacing(0)
+        shell = QHBoxLayout(central)
+        shell.setContentsMargins(0, 0, 0, 0)
+        shell.setSpacing(0)
 
-        # Header
-        self.header = HeaderWidget()
-        main_l.addWidget(self.header)
+        # ── Left nav rail ──
+        self.sidebar = NavSidebar()
+        shell.addWidget(self.sidebar)
 
-        # Tabs
-        self.tabs = QTabWidget()
-        self.tabs.setDocumentMode(True)          # removes light frame bleed at tab-bar edge
-        self.tabs.tabBar().setExpanding(False)
-        self.tabs.tabBar().setDrawBase(False)
-        main_l.addWidget(self.tabs, 1)
+        # ── Content column ──
+        content = QWidget()
+        col = QVBoxLayout(content)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(0)
 
-        # Create tabs
+        self.topbar = TopBar()
+        col.addWidget(self.topbar)
+
+        self.stack = QStackedWidget()
+        col.addWidget(self.stack, 1)
+        shell.addWidget(content, 1)
+
+        # Create pages
         self.dashboard_tab = DashboardTab()
         self.live_tab      = LiveTab(self.detector)
         self.analyze_tab   = AnalyzeTab(self.detector)
@@ -345,15 +465,15 @@ class MainWindow(QMainWindow):
         self.edu_tab       = EducationTab()
         self.settings_tab  = SettingsTab(self.detector)
 
-        self.tabs.addTab(self.dashboard_tab, "  ◈  Dashboard  ")
-        self.tabs.addTab(self.live_tab,      "  🎥  Live Detection  ")
-        self.tabs.addTab(self.analyze_tab,   "  🔍  Analyze Media  ")
-        self.tabs.addTab(self.batch_tab,     "  🗂  Batch Scan  ")
-        self.tabs.addTab(self.edu_tab,       "  📚  How It Works  ")
-        self.tabs.addTab(self.settings_tab,  "  ⚙   Settings  ")
+        for page in [self.dashboard_tab, self.live_tab, self.analyze_tab,
+                     self.batch_tab, self.edu_tab, self.settings_tab]:
+            self.stack.addWidget(page)
 
-        # Wire up cross-tab signals
-        self.dashboard_tab.navigate.connect(self.tabs.setCurrentIndex)
+        # Wire navigation
+        self.sidebar.navigate.connect(self._goto)
+        self.dashboard_tab.navigate.connect(self._goto)
+
+        # Cross-tab signals
         self.live_tab.status_msg.connect(self._on_status)
         self.live_tab.analysis_done.connect(
             lambda f, v, s: self.dashboard_tab.record_analysis(f, v, s)
@@ -384,13 +504,21 @@ class MainWindow(QMainWindow):
         self._sb_lbl.setStyleSheet(f"color: {TEXT_DIM};")
         sb.addWidget(self._sb_lbl)
 
+        # Start on Dashboard
+        self._goto(0)
+
+    def _goto(self, index: int):
+        self.stack.setCurrentIndex(index)
+        self.sidebar.select(index)
+        self.topbar.set_page(index)
+
     def _build_menu(self):
         mb = self.menuBar()
 
         file_m = mb.addMenu("File")
         open_a = QAction("Open Media File…", self)
         open_a.setShortcut("Ctrl+O")
-        open_a.triggered.connect(lambda: self.tabs.setCurrentIndex(2))
+        open_a.triggered.connect(lambda: self._goto(2))
         file_m.addAction(open_a)
         file_m.addSeparator()
         quit_a = QAction("Quit", self)
@@ -402,7 +530,8 @@ class MainWindow(QMainWindow):
         for i, n in enumerate(["Dashboard", "Live Detection", "Analyze Media",
                                "Batch Scan", "How It Works", "Settings"]):
             a = QAction(n, self)
-            a.triggered.connect(lambda _, idx=i: self.tabs.setCurrentIndex(idx))
+            a.setShortcut(f"Ctrl+{i+1}")
+            a.triggered.connect(lambda _, idx=i: self._goto(idx))
             view_m.addAction(a)
 
         help_m = mb.addMenu("Help")
@@ -415,13 +544,15 @@ class MainWindow(QMainWindow):
 
     # ── Signals ───────────────────────────────────────────────────────────────
     def _on_status(self, msg: str):
-        self.header.set_status(msg, "ok" if "complete" in msg.lower() else "info")
+        level = "ok" if "complete" in msg.lower() else (
+            "error" if "error" in msg.lower() or "fail" in msg.lower() else "info")
+        self.sidebar.set_status(msg, level)
         self.statusBar().showMessage(msg, 5000)
 
     def _on_snapshot(self, frame):
         """Live tab sent a snapshot — load into analyze tab and switch to it."""
         self.analyze_tab.load_frame(frame)
-        self.tabs.setCurrentIndex(2)
+        self._goto(2)
 
     def _show_about(self):
         QMessageBox.about(

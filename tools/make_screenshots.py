@@ -25,6 +25,11 @@ DEMO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 
 def settle_dial(dial, value, label):
     dial.set_value(value, label)
+    freeze_dial(dial)
+
+
+def freeze_dial(dial):
+    """Snap the animated dial straight to its target (no animation for the grab)."""
     dial._value = dial._target
     if dial._timer.isActive():
         dial._timer.stop()
@@ -80,20 +85,25 @@ def main():
     ]
     for name, verdict, score in samples:
         dash.record_analysis(name, verdict, score)
-    win.tabs.setCurrentIndex(0)
+    win._goto(0)
     grab(win, app, "dashboard.png")
 
     # ── LIVE DETECTION ─────────────────────────────────────────────────────────
     live = win.live_tab
-    # annotated demo frame
-    from src.detection.face_analyzer import analyze_face, draw_face_overlay
+    # annotated demo frame using the real full-res overlay path
+    from src.gui.live_tab import _draw_live_overlay
+    from src.gui.widgets import verdict_view
+    from src.detection.face_analyzer import analyze_face
+    demo_score = 0.12
     fa = analyze_face(portrait)
-    annotated = draw_face_overlay(portrait.copy(), fa, 0.31) if fa.faces_found else portrait.copy()
+    demo_result = type("R", (), {"face_rects": fa.face_rects, "analyzed_wh": (portrait.shape[1], portrait.shape[0]),
+                                 "overall_score": demo_score})()
+    annotated = _draw_live_overlay(portrait, demo_result)
     live.cam_lbl.setPixmap(bgr_to_pix(annotated, 560, 420))
-    settle_dial(live.dial, 0.31, "REAL")
-    live.verdict_lbl.setText("REAL")
-    from src.gui.theme import GREEN
-    live.verdict_lbl.setStyleSheet(f"color: {GREEN}; letter-spacing: 5px; font-size: 16px; font-weight: 900;")
+    live.dial.set_result(demo_score); freeze_dial(live.dial)
+    flabel, fconf, fcolor = verdict_view(demo_score)
+    live.verdict_lbl.setText(flabel)
+    live.verdict_lbl.setStyleSheet(f"color: {fcolor.name()}; letter-spacing: 4px; font-size: 17px; font-weight: 900;")
     import random
     random.seed(3)
     for v in [0.2,0.25,0.31,0.28,0.35,0.3,0.27,0.33,0.29,0.31,0.34,0.3,0.26,0.32,0.31,
@@ -107,7 +117,7 @@ def main():
     live.start_btn.setObjectName("dangerBtn"); live.start_btn.setStyle(live.start_btn.style())
     live.snap_btn.setEnabled(True); live.save_btn.setEnabled(True)
     live._pulse.start()
-    win.tabs.setCurrentIndex(1)
+    win._goto(1)
     grab(win, app, "live_detection.png")
     live._pulse.stop()
 
@@ -121,10 +131,10 @@ def main():
     w.viz_ready.connect(analyze._add_viz)
     w.result_ready.connect(analyze._on_result)
     w.run()
-    settle_dial(analyze.dial, analyze._last_result.overall_score, analyze._last_result.label)
+    freeze_dial(analyze.dial)
     analyze._toggle_heatmap()  # show heatmap overlay
     analyze.result_tabs.setCurrentIndex(0)  # scores
-    win.tabs.setCurrentIndex(2)
+    win._goto(2)
     grab(win, app, "analyze_media.png")
 
     # ── ANALYZE / TEMPORAL (video) — separate showcase ─────────────────────────
@@ -148,9 +158,9 @@ def main():
     w2.result_ready.connect(analyze._on_result)
     w2.run()
     if analyze._last_result:
-        settle_dial(analyze.dial, analyze._last_result.overall_score, analyze._last_result.label)
+        freeze_dial(analyze.dial)
     analyze.result_tabs.setCurrentIndex(1)  # temporal
-    win.tabs.setCurrentIndex(2)
+    win._goto(2)
     grab(win, app, "temporal_analysis.png")
 
     # ── BATCH SCAN ─────────────────────────────────────────────────────────────
@@ -184,15 +194,15 @@ def main():
     batch._refresh_stats()
     batch.export_btn.setEnabled(True)
     batch.scan_btn.setEnabled(True)
-    win.tabs.setCurrentIndex(3)
+    win._goto(3)
     grab(win, app, "batch_scan.png")
 
     # ── HOW IT WORKS ───────────────────────────────────────────────────────────
-    win.tabs.setCurrentIndex(4)
+    win._goto(4)
     grab(win, app, "how_it_works.png")
 
     # ── SETTINGS ───────────────────────────────────────────────────────────────
-    win.tabs.setCurrentIndex(5)
+    win._goto(5)
     grab(win, app, "settings.png")
 
     print("All screenshots generated.")

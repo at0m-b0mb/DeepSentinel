@@ -25,6 +25,8 @@ class DetectionResult:
     methods_used: int
     viz_frames: dict = field(default_factory=dict)
     annotated_frame: Optional[np.ndarray] = None
+    face_rects: list = field(default_factory=list)   # (x,y,w,h) in analyzed-frame coords
+    analyzed_wh: tuple = (0, 0)                       # (w,h) of the analyzed frame
 
 
 class DeepfakeDetector:
@@ -125,6 +127,8 @@ class DeepfakeDetector:
             methods_used=methods_used,
             viz_frames=viz_frames,
             annotated_frame=annotated,
+            face_rects=list(face_result.face_rects) if face_result else [],
+            analyzed_wh=(image_bgr.shape[1], image_bgr.shape[0]),
         )
 
     def _ensemble(self, scores: dict, methods_used: int) -> float:

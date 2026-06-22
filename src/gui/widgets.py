@@ -27,6 +27,21 @@ def _score_qcolor(score: float) -> QColor:
     return QColor(GREEN)
 
 
+def verdict_view(deepfake_score: float):
+    """Map a raw deepfake score (0=real,1=fake) to a human-friendly presentation.
+
+    Returns (friendly_label, confidence_0_1, qcolor). Confidence is framed so a
+    clearly-real subject reads as a HIGH number (e.g. 0.08 fake → 92% AUTHENTIC),
+    which is far more intuitive than showing "8%".
+    """
+    s = max(0.0, min(1.0, deepfake_score))
+    if s >= 0.65:
+        return "LIKELY FAKE", s, QColor(RED)
+    elif s >= 0.40:
+        return "SUSPICIOUS", s, QColor(AMBER)
+    return "AUTHENTIC", 1.0 - s, QColor(GREEN)
+
+
 def glow_effect(widget: QWidget, color: str = CYAN, radius: int = 20):
     fx = QGraphicsDropShadowEffect(widget)
     fx.setBlurRadius(radius)
@@ -60,14 +75,19 @@ class ConfidenceDial(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-    def set_value(self, value: float, label: str = ""):
+    def set_value(self, value: float, label: str = "", color: QColor | None = None):
         self._target = max(0.0, min(1.0, value))
         if label:
             self._label = label.upper()
-        self._pct_text = f"{int(self._target * 100)}%"
-        self._color = _score_qcolor(self._target)
+        self._pct_text = f"{int(round(self._target * 100))}%"
+        self._color = color if color is not None else _score_qcolor(self._target)
         if not self._timer.isActive():
             self._timer.start()
+
+    def set_result(self, deepfake_score: float):
+        """Display verdict confidence (not raw score), coloured by verdict."""
+        label, conf, color = verdict_view(deepfake_score)
+        self.set_value(conf, label, color)
 
     def reset(self):
         self._target = 0.0

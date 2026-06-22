@@ -205,6 +205,23 @@ QPushButton#iconBtn:hover {{
     border-color: {rgba(CYAN, 0.33)};
 }}
 
+/* Sidebar nav items are fully custom-painted — keep them flat */
+QPushButton#navBtn {{
+    background: transparent;
+    border: none;
+    padding: 0;
+}}
+QPushButton#navBtn:hover, QPushButton#navBtn:checked, QPushButton#navBtn:pressed {{
+    background: transparent;
+    border: none;
+}}
+
+/* Sidebar container */
+QFrame#navSidebar {{
+    background: {BG_DEEP};
+    border: none;
+}}
+
 /* ─── Labels ─── */
 QLabel {{
     color: {TEXT_HI};
