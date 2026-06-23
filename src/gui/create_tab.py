@@ -103,11 +103,22 @@ class MediaPicker(QFrame):
         self.thumb.setText("Drop here  ·  or Browse")
         lay.addWidget(self.thumb)
 
+        self.status = QLabel("")
+        self.status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px;")
+        self.status.setVisible(False)
+        lay.addWidget(self.status)
+
         browse = QPushButton("📂  Browse")
         browse.setObjectName("ghostBtn")
         browse.setFixedHeight(32)
         browse.clicked.connect(self._browse)
         lay.addWidget(browse)
+
+    def set_status(self, text: str, color: str):
+        self.status.setText(text)
+        self.status.setStyleSheet(f"color: {color}; font-size: 10px; font-weight: 600;")
+        self.status.setVisible(bool(text))
 
     def _filter(self):
         if self.accept_video:
@@ -172,6 +183,8 @@ class CreateTab(QWidget):
         self._target_path = None
         self._output_path = None
         self._output_is_video = False
+        self._src_has_face = True
+        self._tgt_has_face = True
         self._build_ui()
 
     def _build_ui(self):
@@ -291,14 +304,44 @@ class CreateTab(QWidget):
     # ── Logic ─────────────────────────────────────────────────────────────────
     def _on_src(self, path):
         self._src_path = path
+        self._src_has_face = self._check_face(path, self.src_picker)
         self._refresh_generate()
 
     def _on_tgt(self, path):
         self._target_path = path
+        self._tgt_has_face = self._check_face(path, self.tgt_picker)
         self._refresh_generate()
 
+    def _check_face(self, path: str, picker) -> bool:
+        """Quick face-presence check so the user gets instant feedback."""
+        from ..detection.faceswap import _detect_face
+        ext = os.path.splitext(path)[1].lower()
+        img = None
+        if ext in VIDEO_EXTS:
+            cap = cv2.VideoCapture(path); ok, fr = cap.read(); cap.release()
+            img = fr if ok else None
+        else:
+            img = cv2.imread(path)
+        if img is None:
+            picker.set_status("⚠  Could not read this file", AMBER)
+            return False
+        try:
+            face = _detect_face(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
+        except Exception:
+            face = None
+        if face is not None:
+            picker.set_status("✓  Face detected", GREEN)
+            return True
+        picker.set_status("⚠  No face detected — use a clear, front-facing photo", AMBER)
+        return False
+
     def _refresh_generate(self):
-        self.generate_btn.setEnabled(bool(self._src_path and self._target_path))
+        ready = bool(self._src_path and self._target_path)
+        self.generate_btn.setEnabled(ready)
+        if ready and not getattr(self, "_src_has_face", True):
+            self.generate_btn.setToolTip("The source has no detectable face — generation will likely fail.")
+        else:
+            self.generate_btn.setToolTip("")
 
     def _generate(self):
         if not (self._src_path and self._target_path):

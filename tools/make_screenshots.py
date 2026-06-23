@@ -198,6 +198,10 @@ def main():
     cv2.imwrite(tgt_tmp, tgt)
     lab.src_picker.set_path(src_tmp)
     lab.tgt_picker.set_path(tgt_tmp)
+    # Illustrative positive face status (real photos would detect; the demo art doesn't)
+    from src.gui.theme import GREEN as _G
+    lab.src_picker.set_status("✓  Face detected", _G)
+    lab.tgt_picker.set_status("✓  Face detected", _G)
     # Build an illustrative "swapped" result (tinted blend of source over target)
     result = cv2.addWeighted(portrait, 0.6, tgt, 0.4, 0)
     cv2.putText(result, "FACE-SWAPPED", (16, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (110, 230, 255), 2, cv2.LINE_AA)
