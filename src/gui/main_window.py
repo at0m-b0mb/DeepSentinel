@@ -19,13 +19,14 @@ from PyQt6.QtGui import (
 from .theme import (
     CYAN, CYAN_MID, CYAN_DIM, RED, RED_DIM, GREEN, AMBER, PURPLE,
     TEXT_HI, TEXT_MID, TEXT_LO, TEXT_DIM,
-    BG_VOID, BG_DEEP, BG_CARD, BG_CARD2, BORDER_MID, BORDER_HI, BORDER_CYAN,
+    BG_VOID, BG_DEEP, BG_CARD, BG_CARD2, BG_HOVER, BORDER_MID, BORDER_HI, BORDER_CYAN,
     FONT_MONO, FONT_UI, rgba,
 )
 from .widgets import PulsingDot, Toast, glow_effect
 from ..detection.detector import DeepfakeDetector
 from .live_tab import LiveTab
 from .analyze_tab import AnalyzeTab
+from .create_tab import CreateTab
 from .batch_tab import BatchTab
 from .education_tab import EducationTab
 from .settings_tab import SettingsTab
@@ -175,6 +176,7 @@ class NavSidebar(QFrame):
         ("◈", "Dashboard"),
         ("🎥", "Live Detection"),
         ("🔍", "Analyze Media"),
+        ("🎭", "Face-Swap Lab"),
         ("🗂", "Batch Scan"),
         ("📚", "How It Works"),
         ("⚙", "Settings"),
@@ -292,6 +294,7 @@ class TopBar(QWidget):
         ("◈", "Dashboard", "Session overview & recent activity"),
         ("🎥", "Live Detection", "Real-time webcam deepfake analysis"),
         ("🔍", "Analyze Media", "Forensic analysis of images & videos"),
+        ("🎭", "Face-Swap Lab", "Red-team: create a deepfake, then detect it"),
         ("🗂", "Batch Scan", "Analyze an entire folder at once"),
         ("📚", "How It Works", "The science behind deepfakes & detection"),
         ("⚙", "Settings", "Methods, models & configuration"),
@@ -465,12 +468,13 @@ class MainWindow(QMainWindow):
         self.dashboard_tab = DashboardTab()
         self.live_tab      = LiveTab(self.detector)
         self.analyze_tab   = AnalyzeTab(self.detector)
+        self.create_tab    = CreateTab()
         self.batch_tab     = BatchTab(self.detector)
         self.edu_tab       = EducationTab()
         self.settings_tab  = SettingsTab(self.detector)
 
         for page in [self.dashboard_tab, self.live_tab, self.analyze_tab,
-                     self.batch_tab, self.edu_tab, self.settings_tab]:
+                     self.create_tab, self.batch_tab, self.edu_tab, self.settings_tab]:
             self.stack.addWidget(page)
 
         # Wire navigation
@@ -487,6 +491,8 @@ class MainWindow(QMainWindow):
         self.analyze_tab.analysis_done.connect(
             lambda f, v, s: self.dashboard_tab.record_analysis(f, v, s)
         )
+        self.create_tab.status_msg.connect(self._on_status)
+        self.create_tab.detect_requested.connect(self._on_detect_requested)
         self.batch_tab.status_msg.connect(self._on_status)
         self.batch_tab.analysis_done.connect(
             lambda f, v, s: self.dashboard_tab.record_analysis(f, v, s)
@@ -571,7 +577,7 @@ class MainWindow(QMainWindow):
 
         view_m = mb.addMenu("View")
         for i, n in enumerate(["Dashboard", "Live Detection", "Analyze Media",
-                               "Batch Scan", "How It Works", "Settings"]):
+                               "Face-Swap Lab", "Batch Scan", "How It Works", "Settings"]):
             a = QAction(n, self)
             a.setShortcut(f"Ctrl+{i+1}")
             a.triggered.connect(lambda _, idx=i: self._goto(idx))
@@ -603,6 +609,12 @@ class MainWindow(QMainWindow):
         self.analyze_tab.load_frame(frame)
         self._goto(2)
 
+    def _on_detect_requested(self, path: str):
+        """Face-Swap Lab produced a deepfake — load it into Analyze and run."""
+        self.analyze_tab._load_file(path)
+        self._goto(2)
+        self.analyze_tab._run_analysis()
+
     def _show_about(self):
         QMessageBox.about(
             self, "About DeepSentinel",
@@ -625,4 +637,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'batch_tab') and self.batch_tab.worker:
             self.batch_tab.worker.stop()
             self.batch_tab.worker.wait(2000)
+        if hasattr(self, 'create_tab') and self.create_tab.worker and self.create_tab.worker.isRunning():
+            self.create_tab.worker.wait(2000)
         super().closeEvent(event)

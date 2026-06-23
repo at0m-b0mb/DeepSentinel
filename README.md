@@ -60,23 +60,29 @@ and learn exactly how deepfakes work under the hood.
   </tr>
   <tr>
     <td align="center" width="50%">
+      <img src="assets/screenshots/faceswap_lab.png" alt="Face-Swap Lab" width="100%" style="border-radius:8px"/>
+      <br/>
+      <sub><b>🎭 Face-Swap Lab</b> — Red-team: <b>create</b> a deepfake, then detect it</sub>
+    </td>
+    <td align="center" width="50%">
       <img src="assets/screenshots/batch_scan.png" alt="Batch Scan" width="100%" style="border-radius:8px"/>
       <br/>
       <sub><b>🗂 Batch Scan</b> — Analyze whole folders, sortable table, CSV export</sub>
     </td>
+  </tr>
+  <tr>
     <td align="center" width="50%">
       <img src="assets/screenshots/how_it_works.png" alt="Education" width="100%" style="border-radius:8px"/>
       <br/>
       <sub><b>📚 How It Works</b> — Interactive education with the original algorithm</sub>
     </td>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/settings.png" alt="Settings" width="100%" style="border-radius:8px"/>
+      <br/>
+      <sub><b>⚙ Settings</b> — Methods, thresholds &amp; one-click PyTorch install</sub>
+    </td>
   </tr>
 </table>
-
-<div align="center">
-  <img src="assets/screenshots/settings.png" alt="Settings" width="60%" style="border-radius:8px"/>
-  <br/>
-  <sub><b>⚙ Settings</b> — Configure methods, thresholds, MesoNet weights &amp; camera</sub>
-</div>
 
 ---
 
@@ -85,6 +91,16 @@ and learn exactly how deepfakes work under the hood.
 <table>
   <tr>
     <td width="50%" valign="top">
+      <h3>🎭 Face-Swap Lab <sub>(red-team)</sub></h3>
+      <ul>
+        <li><b>Create a deepfake</b>: swap a source face into a photo or video</li>
+        <li>Model-free pipeline — Haar detect → align → seamless clone</li>
+        <li>One-click <b>"Detect this Deepfake →"</b> closes the create→detect loop</li>
+        <li>Live preview, save output, drag-and-drop source &amp; target</li>
+        <li>Prominent <b>consent / legality</b> warning — educational use only</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
       <h3>🎥 Live Webcam Detection</h3>
       <ul>
         <li><b>HD (720p) capture</b> with a sharp full-resolution overlay</li>
@@ -92,22 +108,20 @@ and learn exactly how deepfakes work under the hood.
         <li><b>Temporal smoothing</b> keeps the verdict from flickering</li>
         <li>Animated <b>arc confidence gauge</b> + live history graph</li>
         <li><b>Snapshot → Analyze</b>: freeze any frame for full forensics</li>
-        <li>FPS counter, save-frame button, start/stop toggle</li>
       </ul>
     </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <h3>🔍 Static Media Analysis</h3>
       <ul>
         <li>Drag-and-drop or browse <b>images &amp; videos</b></li>
         <li>Full multi-method pipeline with progress tracking</li>
         <li>Forensic <b>visualization strip</b>: FFT spectrum, ELA map, noise heatmap</li>
-        <li><b>Explainability heatmap</b> — see <i>where</i> artifacts concentrate</li>
         <li><b>EXIF metadata panel</b> with AI-software flag detection</li>
         <li>Export <b>rich PDF / HTML / text</b> forensic reports</li>
       </ul>
     </td>
-  </tr>
-  <tr>
     <td width="50%" valign="top">
       <h3>🔥 Explainability Heatmap</h3>
       <ul>
@@ -118,6 +132,8 @@ and learn exactly how deepfakes work under the hood.
         <li>Reports a <b>concentration score</b> (localized vs diffuse)</li>
       </ul>
     </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <h3>🎞 Video Temporal Analysis</h3>
       <ul>
@@ -128,8 +144,6 @@ and learn exactly how deepfakes work under the hood.
         <li>Peak-suspicion frame auto-selected for deep analysis</li>
       </ul>
     </td>
-  </tr>
-  <tr>
     <td width="50%" valign="top">
       <h3>🗂 Batch Folder Scan</h3>
       <ul>
@@ -140,6 +154,8 @@ and learn exactly how deepfakes work under the hood.
         <li><b>CSV export</b> of the full result set</li>
       </ul>
     </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <h3>📄 Rich Report Export</h3>
       <ul>
@@ -148,6 +164,15 @@ and learn exactly how deepfakes work under the hood.
         <li>Includes heatmap, EXIF data &amp; temporal findings</li>
         <li>Shareable — opens in any browser / PDF viewer</li>
         <li>Always carries the educational-use disclaimer</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>⚙ Settings &amp; Models</h3>
+      <ul>
+        <li>Toggle each detection method on/off</li>
+        <li>Adjust the deepfake decision <b>threshold</b></li>
+        <li><b>One-click PyTorch install</b> with a live log</li>
+        <li>Load MesoNet weights · pick camera &amp; quality</li>
       </ul>
     </td>
   </tr>
@@ -237,7 +262,8 @@ DeepSentinel/
 │   │   ├── metadata.py            # EXIF extraction + AI-software flag detection
 │   │   ├── heatmap.py             # Explainability suspicion heatmap (ELA+texture+noise)
 │   │   ├── temporal.py            # Video temporal forensics — blink + flicker
-│   │   └── report.py             # Rich HTML / PDF report generation
+│   │   ├── report.py              # Rich HTML / PDF report generation
+│   │   └── faceswap.py            # RED-TEAM face-swap deepfake generator
 │   │
 │   ├── education/
 │   │   └── pipeline.py            # HTML content for the How It Works tab
@@ -245,14 +271,15 @@ DeepSentinel/
 │   └── gui/
 │       ├── theme.py               # Dark cyberpunk QSS stylesheet + palette
 │       ├── widgets.py             # ConfidenceDial · HistoryGraph · TimelineGraph
-│       │                          #   GlowScoreBar · StatCard · PulsingDot
+│       │                          #   VerdictDonut · Toast · CameraPlaceholder
 │       ├── main_window.py         # Sidebar app-shell · NavSidebar · TopBar · pages
-│       ├── dashboard_tab.py       # Session stats + history + quick actions
+│       ├── dashboard_tab.py       # Session stats + donut + history + quick actions
 │       ├── live_tab.py            # Webcam feed + CameraWorker QThread
 │       ├── analyze_tab.py         # Static analysis + heatmap + temporal + EXIF
+│       ├── create_tab.py          # Face-Swap Lab — create a deepfake, then detect
 │       ├── batch_tab.py           # Batch folder scan + results table + CSV
 │       ├── education_tab.py       # Sidebar nav + rich-HTML content + code panel
-│       └── settings_tab.py        # Method toggles · thresholds · MesoNet loader
+│       └── settings_tab.py        # Method toggles · threshold · 1-click PyTorch install
 │
 ├── tools/
 │   └── make_screenshots.py        # Renders GUI tabs to PNG for the README

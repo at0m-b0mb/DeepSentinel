@@ -42,7 +42,13 @@ def bgr_to_pix(bgr, w, h):
     return QPixmap.fromImage(qt.copy())
 
 
-def grab(widget, app, name):
+def clear_toasts(win):
+    for t in list(getattr(win, "_toasts", [])):
+        t.hide(); t.setParent(None); t.deleteLater()
+    win._toasts = []
+
+
+def grab(widget, app, name, keep_toasts=False):
     # Clear any in-flight page-fade effect so the grab renders at full opacity
     try:
         page = widget.stack.currentWidget()
@@ -50,6 +56,8 @@ def grab(widget, app, name):
             page.setGraphicsEffect(None)
     except Exception:
         pass
+    if not keep_toasts:
+        clear_toasts(widget)
     for _ in range(6):
         app.processEvents()
     pix = widget.grab()
@@ -98,17 +106,9 @@ def main():
         dash.donut._timer.stop()
     dash.donut.update()
     win._goto(0)
-    # Showcase a toast notification
+    # Showcase a toast notification (kept for this grab; cleared on the next)
     win._toast("Analysis complete · ceo_announcement.jpg → AUTHENTIC 91%", "ok")
-    grab(win, app, "dashboard.png")
-    # Clear toasts so they don't bleed into later screenshots
-    for t in list(getattr(win, "_toasts", [])):
-        t.hide()
-        t.setParent(None)
-        t.deleteLater()
-    win._toasts = []
-    for _ in range(6):
-        app.processEvents()
+    grab(win, app, "dashboard.png", keep_toasts=True)
 
     # ── LIVE DETECTION ─────────────────────────────────────────────────────────
     live = win.live_tab
@@ -186,6 +186,27 @@ def main():
     win._goto(2)
     grab(win, app, "temporal_analysis.png")
 
+    # ── FACE-SWAP LAB ──────────────────────────────────────────────────────────
+    lab = win.create_tab
+    # Source = portrait; Target = a colour-graded variant; Result = a blended composite
+    src_tmp = os.path.join(tempfile.mkdtemp(), "source_face.png")
+    cv2.imwrite(src_tmp, portrait)
+    tgt = portrait.copy()
+    tgt[:, :, 0] = np.clip(tgt[:, :, 0].astype(int) + 55, 0, 255)
+    tgt[:, :, 2] = np.clip(tgt[:, :, 2].astype(int) - 25, 0, 255)
+    tgt_tmp = os.path.join(tempfile.mkdtemp(), "target_clip.png")
+    cv2.imwrite(tgt_tmp, tgt)
+    lab.src_picker.set_path(src_tmp)
+    lab.tgt_picker.set_path(tgt_tmp)
+    # Build an illustrative "swapped" result (tinted blend of source over target)
+    result = cv2.addWeighted(portrait, 0.6, tgt, 0.4, 0)
+    cv2.putText(result, "FACE-SWAPPED", (16, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (110, 230, 255), 2, cv2.LINE_AA)
+    lab._show_result_frame(result)
+    lab.detect_btn.setEnabled(True)
+    lab.save_btn.setEnabled(True)
+    win._goto(3)
+    grab(win, app, "faceswap_lab.png")
+
     # ── BATCH SCAN ─────────────────────────────────────────────────────────────
     batch = win.batch_tab
     batch._folder = "/Users/research/datasets/faceforensics_sample"
@@ -217,15 +238,15 @@ def main():
     batch._refresh_stats()
     batch.export_btn.setEnabled(True)
     batch.scan_btn.setEnabled(True)
-    win._goto(3)
+    win._goto(4)
     grab(win, app, "batch_scan.png")
 
     # ── HOW IT WORKS ───────────────────────────────────────────────────────────
-    win._goto(4)
+    win._goto(5)
     grab(win, app, "how_it_works.png")
 
     # ── SETTINGS ───────────────────────────────────────────────────────────────
-    win._goto(5)
+    win._goto(6)
     grab(win, app, "settings.png")
 
     print("All screenshots generated.")

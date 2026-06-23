@@ -191,13 +191,14 @@ class DashboardTab(QWidget):
         div.setFixedHeight(1)
         layout.addWidget(div)
 
-        # (label, absolute tab index in MainWindow) — keep in sync with main_window tab order
+        # (label, absolute page index in MainWindow) — keep in sync with main_window page order
         actions = [
             ("🎥  Start Live Detection",  1, "primaryBtn"),
             ("🔍  Analyze a File",         2, "ghostBtn"),
-            ("🗂  Batch Folder Scan",      3, "ghostBtn"),
-            ("📚  Open How It Works",      4, "ghostBtn"),
-            ("⚙   Open Settings",          5, "ghostBtn"),
+            ("🎭  Face-Swap Lab",          3, "ghostBtn"),
+            ("🗂  Batch Folder Scan",      4, "ghostBtn"),
+            ("📚  Open How It Works",      5, "ghostBtn"),
+            ("⚙   Open Settings",          6, "ghostBtn"),
         ]
         for label, tab_idx, style in actions:
             btn = QPushButton(label)
