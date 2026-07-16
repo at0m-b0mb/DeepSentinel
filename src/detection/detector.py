@@ -39,6 +39,10 @@ class DeepfakeDetector:
         self.use_noise = True
         self.use_mesonet = True
 
+        # Decision threshold for DEEPFAKE (settable from Settings).
+        # SUSPICIOUS band spans [threshold - 0.25, threshold).
+        self.threshold = 0.65
+
         # Weights for ensemble (calibrated empirically)
         self._weights = {
             "fft":     0.20,
@@ -146,11 +150,12 @@ class DeepfakeDetector:
 
         return float(np.clip(weighted_sum / total_weight, 0.0, 1.0)) if total_weight > 0 else 0.0
 
-    @staticmethod
-    def _classify(score: float) -> tuple[str, float]:
-        if score >= 0.65:
+    def _classify(self, score: float) -> tuple[str, float]:
+        deepfake_thr = self.threshold
+        suspicious_thr = max(0.05, deepfake_thr - 0.25)
+        if score >= deepfake_thr:
             return "DEEPFAKE", score * 100
-        elif score >= 0.40:
+        elif score >= suspicious_thr:
             return "SUSPICIOUS", score * 100
         else:
             return "REAL", (1.0 - score) * 100

@@ -92,8 +92,7 @@ class BatchWorker(QThread):
         if not scores:
             raise ValueError("no frames")
         combined = float(0.6 * np.mean(scores) + 0.4 * np.max(scores))
-        label = ("DEEPFAKE" if combined >= 0.65 else
-                 "SUSPICIOUS" if combined >= 0.40 else "REAL")
+        label, _ = self.detector._classify(combined)
         return {"path": path, "name": os.path.basename(path), "type": "VID",
                 "verdict": label, "score": combined,
                 "faces": faces, "methods": 3, "note": f"{len(scores)} frames"}

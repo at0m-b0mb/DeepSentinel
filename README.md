@@ -170,7 +170,9 @@ and learn exactly how deepfakes work under the hood.
       <h3>⚙ Settings &amp; Models</h3>
       <ul>
         <li>Toggle each detection method on/off</li>
-        <li>Adjust the deepfake decision <b>threshold</b></li>
+        <li>Live <b>decision threshold</b> — retunes REAL / SUSPICIOUS / DEEPFAKE
+            across live, analyze &amp; batch</li>
+        <li><b>Preferences persist</b> across restarts (QSettings)</li>
         <li><b>One-click PyTorch install</b> with a live log</li>
         <li>Load MesoNet weights · pick camera &amp; quality</li>
       </ul>

@@ -110,12 +110,7 @@ class AnalysisWorker(QThread):
         # Blend in the temporal verdict (temporal score weighted with frame score)
         combined = float(np.clip(0.5 * result.overall_score + 0.5 * temporal.temporal_score, 0, 1))
         result.overall_score = combined
-        if combined >= 0.65:
-            result.label, result.confidence_pct = "DEEPFAKE", combined * 100
-        elif combined >= 0.40:
-            result.label, result.confidence_pct = "SUSPICIOUS", combined * 100
-        else:
-            result.label, result.confidence_pct = "REAL", (1 - combined) * 100
+        result.label, result.confidence_pct = self.detector._classify(combined)
 
         self.progress.emit(90, "Building visualizations…")
         for title, viz in result.viz_frames.items():

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QCheckBox, QSlider, QLineEdit, QFrame, QFileDialog,
     QComboBox, QTextEdit, QProgressBar,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, QSettings
 
 from .theme import (
     CYAN, TEXT_MID as TEXT_SECONDARY, TEXT_DIM, GREEN, RED, AMBER as ORANGE,
@@ -55,7 +55,11 @@ class SettingsTab(QWidget):
     def __init__(self, detector: DeepfakeDetector, parent=None):
         super().__init__(parent)
         self.detector = detector
+        self._settings = QSettings("at0m-b0mb", "DeepSentinel")
+        self._loading = False
         self._build_ui()
+        self._load_settings()
+        self._wire_persistence()
 
     def _build_ui(self):
         root = QVBoxLayout(self)
@@ -74,6 +78,60 @@ class SettingsTab(QWidget):
         root.addWidget(self._build_camera_group())
         root.addWidget(self._build_about_group())
         root.addStretch()
+
+    # ── Persistence (QSettings) ───────────────────────────────────────────────
+    def _load_settings(self):
+        """Restore saved preferences and apply them to the detector + widgets."""
+        s = self._settings
+        self._loading = True
+        try:
+            def b(key, default):
+                v = s.value(key, default)
+                return v if isinstance(v, bool) else str(v).lower() == "true"
+
+            self.chk_fft.setChecked(b("method/fft", True))
+            self.chk_ela.setChecked(b("method/ela", True))
+            self.chk_face.setChecked(b("method/face", True))
+            self.chk_noise.setChecked(b("method/noise", True))
+            self.chk_meso.setChecked(b("method/mesonet", True))
+            # Apply to detector explicitly (signals are muted during load)
+            self.detector.use_fft = self.chk_fft.isChecked()
+            self.detector.use_ela = self.chk_ela.isChecked()
+            self.detector.use_face = self.chk_face.isChecked()
+            self.detector.use_noise = self.chk_noise.isChecked()
+            self.detector.use_mesonet = self.chk_meso.isChecked()
+
+            thr = int(s.value("detection/threshold", 65))
+            self.thr_slider.setValue(thr)
+            self.detector.threshold = thr / 100.0
+            self.thr_val.setText(f"{thr/100:.2f}")
+
+            self.cam_combo.setCurrentIndex(int(s.value("camera/index", 0)))
+            self.quality_combo.setCurrentIndex(int(s.value("camera/quality", 1)))
+        except Exception:
+            pass
+        finally:
+            self._loading = False
+
+    def _wire_persistence(self):
+        for chk in [self.chk_fft, self.chk_ela, self.chk_face, self.chk_noise, self.chk_meso]:
+            chk.toggled.connect(self._save_settings)
+        self.thr_slider.valueChanged.connect(self._save_settings)
+        self.cam_combo.currentIndexChanged.connect(self._save_settings)
+        self.quality_combo.currentIndexChanged.connect(self._save_settings)
+
+    def _save_settings(self, *_):
+        if self._loading:
+            return
+        s = self._settings
+        s.setValue("method/fft", self.chk_fft.isChecked())
+        s.setValue("method/ela", self.chk_ela.isChecked())
+        s.setValue("method/face", self.chk_face.isChecked())
+        s.setValue("method/noise", self.chk_noise.isChecked())
+        s.setValue("method/mesonet", self.chk_meso.isChecked())
+        s.setValue("detection/threshold", self.thr_slider.value())
+        s.setValue("camera/index", self.cam_combo.currentIndex())
+        s.setValue("camera/quality", self.quality_combo.currentIndex())
 
     def _build_detection_group(self) -> QGroupBox:
         grp = QGroupBox("Detection Methods")
@@ -105,17 +163,23 @@ class SettingsTab(QWidget):
         thr_row = QHBoxLayout()
         self.thr_slider = QSlider(Qt.Orientation.Horizontal)
         self.thr_slider.setRange(30, 90)
-        self.thr_slider.setValue(65)
-        self.thr_val = QLabel("0.65")
+        self.thr_slider.setValue(int(self.detector.threshold * 100))
+        self.thr_val = QLabel(f"{self.detector.threshold:.2f}")
         self.thr_val.setStyleSheet(f"color: {CYAN}; font-family: monospace; font-size: 12px; min-width: 35px;")
-        self.thr_slider.valueChanged.connect(
-            lambda v: self.thr_val.setText(f"{v/100:.2f}")
-        )
+        self.thr_slider.valueChanged.connect(self._on_threshold)
         thr_row.addWidget(self.thr_slider)
         thr_row.addWidget(self.thr_val)
         layout.addLayout(thr_row)
 
+        thr_hint = QLabel("Higher = stricter (fewer false alarms).  Below −0.25 → SUSPICIOUS band.")
+        thr_hint.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px;")
+        layout.addWidget(thr_hint)
+
         return grp
+
+    def _on_threshold(self, v: int):
+        self.detector.threshold = v / 100.0
+        self.thr_val.setText(f"{v/100:.2f}")
 
     def _build_model_group(self) -> QGroupBox:
         grp = QGroupBox("MesoNet Neural Network")
